@@ -18,6 +18,7 @@ import {
     Info,
     Printer,
     FileDown,
+    Loader2,
     CheckCircle2,
     Clock,
     Scale,
@@ -160,17 +161,17 @@ export default function FoodDetailPage() {
             doc.text("NUTRITION", rightColX, currentY);
 
             const tableData = [
-                [{ content: 'MACROS', colSpan: 2, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: 'bold', fontSize: 8 } }],
+                [{ content: 'MACROS', colSpan: 2, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: 'bold' as const, fontSize: 8 } }],
                 ['Calories', `${food.nutrition.calories} kcal`],
                 ['Protein', `${food.nutrition.protein}g`],
                 ['Carbs', `${food.nutrition.carbs}g`],
                 ['Fat', `${food.nutrition.fat}g`],
                 ['Fiber', `${food.nutrition.fiber}g`],
-                [{ content: 'VITAMINS', colSpan: 2, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: 'bold', fontSize: 8 } }],
+                [{ content: 'VITAMINS', colSpan: 2, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: 'bold' as const, fontSize: 8 } }],
                 ['Vitamin A', food.nutrition.vitamins.vitaminA],
                 ['Vitamin C', food.nutrition.vitamins.vitaminC],
                 ['Vitamin D', food.nutrition.vitamins.vitaminD],
-                [{ content: 'MINERALS', colSpan: 2, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: 'bold', fontSize: 8 } }],
+                [{ content: 'MINERALS', colSpan: 2, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: 'bold' as const, fontSize: 8 } }],
                 ['Calcium', food.nutrition.minerals.calcium],
                 ['Iron', food.nutrition.minerals.iron],
                 ['Magnesium', food.nutrition.minerals.magnesium],
@@ -180,12 +181,12 @@ export default function FoodDetailPage() {
                 startY: currentY + 5,
                 margin: { left: rightColX - 5 }, // Nudge table to fit column
                 head: [],
-                body: tableData,
-                theme: 'striped',
+                body: tableData as any,
+                theme: 'striped' as const,
                 styles: { fontSize: 9, cellPadding: 3 },
                 columnStyles: {
-                    0: { fontStyle: 'bold', cellWidth: 35 },
-                    1: { halign: 'right', cellWidth: 30 }
+                    0: { fontStyle: 'bold' as const, cellWidth: 35 },
+                    1: { halign: 'right' as const, cellWidth: 30 }
                 },
                 tableWidth: colWidth + 5
             });
