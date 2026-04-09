@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { FoodItem, getFoodImage } from "../../lib/discover-db";
 import { useGlobalFoodState } from "../../lib/contexts/FoodStateContext";
+import { useFavorites } from "../../lib/hooks/useFavorites";
 
 interface FoodCardProps {
     food: FoodItem;
@@ -21,14 +22,15 @@ export default function FoodCard({
     onOpenNutrition,
     viewMode 
 }: FoodCardProps) {
-    const { savedFoods, blockedFoods, toggleSaveFood, blockFood } = useGlobalFoodState();
+    const { blockedFoods, blockFood } = useGlobalFoodState();
+    const { isFavorite, toggleFavorite } = useFavorites();
     const [hovered, setHovered] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const isSaved = savedFoods.includes(food.id);
+    const favorited = isFavorite(food.id);
     const isBlocked = blockedFoods.includes(food.id);
 
     // Close menu on click outside
@@ -50,7 +52,7 @@ export default function FoodCard({
 
     if (isBlocked) return null;
 
-    const imageUrl = imageError ? getFoodImage(food) : food.image;
+    const imageUrl = food.image || "/placeholder-food.png";
 
     if (viewMode === "list") {
         return (
@@ -115,10 +117,10 @@ export default function FoodCard({
                         <Plus size={20} />
                     </button>
                     <button 
-                        onClick={() => toggleSaveFood(food.id)}
-                        className={`p-2.5 rounded-xl border transition-all ${isSaved ? "bg-red-500 text-white border-red-500 shadow-md" : "border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                        onClick={() => toggleFavorite(food.id)}
+                        className={`p-2.5 rounded-xl border transition-all ${favorited ? "bg-red-500 text-white border-red-500 shadow-md" : "border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
                     >
-                        <Heart size={20} fill={isSaved ? "currentColor" : "none"} />
+                        <Heart size={20} fill={favorited ? "currentColor" : "none"} />
                     </button>
                 </div>
             </motion.div>
@@ -163,10 +165,10 @@ export default function FoodCard({
                         <Plus size={20} />
                     </button>
                     <button 
-                        onClick={() => toggleSaveFood(food.id)}
-                        className={`p-2.5 rounded-xl transition-all shadow-lg ${isSaved ? "bg-red-500 text-white" : "bg-white/90 backdrop-blur-md text-slate-500 hover:text-red-500"}`}
+                        onClick={() => toggleFavorite(food.id)}
+                        className={`p-2.5 rounded-xl transition-all shadow-lg ${favorited ? "bg-red-500 text-white" : "bg-white/90 backdrop-blur-md text-slate-500 hover:text-red-500"}`}
                     >
-                        <Heart size={20} fill={isSaved ? "currentColor" : "none"} />
+                        <Heart size={20} fill={favorited ? "currentColor" : "none"} />
                     </button>
                 </div>
 

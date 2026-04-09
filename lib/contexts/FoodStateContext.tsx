@@ -13,6 +13,7 @@ interface FoodState {
     blockedFoods: string[];
     favoriteFoods: string[];
     collections: Collection[];
+    loading: boolean;
 }
 
 interface FoodStateContextType extends FoodState {
@@ -113,6 +114,7 @@ export function FoodStateProvider({ children }: { children: React.ReactNode }) {
             blockedFoods, 
             favoriteFoods,
             collections,
+            loading: !isLoaded,
             toggleSaveFood,
             toggleFavoriteFood,
             blockFood,

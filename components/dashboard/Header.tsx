@@ -17,18 +17,19 @@ import {
     Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { useMounted } from "../../lib/hooks/useMounted";
 import CalendarModal from "./CalendarModal";
 
 interface HeaderProps {
-    toggleMobileMenu: () => void;
-    viewMode: "day" | "week";
-    setViewMode: (mode: "day" | "week") => void;
-    selectedDate: Date | { start: Date; end: Date | null };
-    onDateChange: (date: Date | { start: Date; end: Date }) => void;
+    toggleMobileMenu?: () => void;
+    viewMode?: "day" | "week";
+    setViewMode?: (mode: "day" | "week") => void;
+    selectedDate?: Date | { start: Date; end: Date | null };
+    onDateChange?: (date: Date | { start: Date; end: Date }) => void;
     theme: "light" | "dark" | "system";
     onThemeChange: (theme: "light" | "dark" | "system") => void;
-    isProcessing: boolean;
+    isProcessing?: boolean;
+    title?: string;
 }
 
 export default function Header({ 
@@ -39,28 +40,33 @@ export default function Header({
     onDateChange,
     theme,
     onThemeChange,
-    isProcessing
+    isProcessing,
+    title
 }: HeaderProps) {
+    const mounted = useMounted();
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [user, setUser] = useState<{ fullName: string } | null>(null);
-    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
+        if (!mounted) return;
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
             setUser(JSON.parse(storedUser));
         }
-    }, []);
+    }, [mounted]);
+
+    if (!mounted) return null;
+
 
     const handleLogout = () => {
         localStorage.clear();
         window.location.href = "/";
     };
 
-    const formatDate = (d: Date | { start: Date; end: Date | null }) => {
-        if (!mounted) return "Loading...";
+    const formatDate = (d?: Date | { start: Date; end: Date | null }) => {
+        if (!mounted || !d) return "";
         if (d instanceof Date) {
+
             return d.toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
         } else {
             const startStr = d.start.toLocaleDateString("en-US", { month: 'short', day: 'numeric' });
@@ -81,7 +87,7 @@ export default function Header({
     };
 
     const nextDate = () => {
-        if (isProcessing) return;
+        if (isProcessing || !selectedDate || !onDateChange) return;
         if (viewMode === "day") {
             const current = selectedDate instanceof Date ? selectedDate : selectedDate.start;
             const next = new Date(current);
@@ -98,8 +104,9 @@ export default function Header({
         }
     };
 
+
     const prevDate = () => {
-        if (isProcessing) return;
+        if (isProcessing || !selectedDate || !onDateChange) return;
         if (viewMode === "day") {
             const current = selectedDate instanceof Date ? selectedDate : selectedDate.start;
             const prev = new Date(current);
@@ -116,9 +123,15 @@ export default function Header({
         }
     };
 
+
     return (
         <header className="sticky top-0 z-40 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 h-16 flex items-center justify-between transition-colors">
             <div className="flex items-center space-x-4">
+                {title && (
+                    <div className="hidden lg:flex items-center space-x-2 mr-4 border-r border-slate-200 dark:border-slate-800 pr-4">
+                        <span className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">{title}</span>
+                    </div>
+                )}
                 <button 
                     onClick={toggleMobileMenu}
                     className="p-2 lg:hidden rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
@@ -126,85 +139,92 @@ export default function Header({
                     <Menu size={20} />
                 </button>
                 
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                    <button 
-                        onClick={() => setViewMode("day")}
-                        disabled={isProcessing}
-                        className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-200 ${
-                            viewMode === "day" 
-                                ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" 
-                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-50"
-                        }`}
-                    >
-                        Day
-                    </button>
-                    <button 
-                        onClick={() => setViewMode("week")}
-                        disabled={isProcessing}
-                        className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-200 ${
-                            viewMode === "week" 
-                                ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" 
-                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-50"
-                        }`}
-                    >
-                        Week
-                    </button>
-                </div>
+                {viewMode && setViewMode && (
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                        <button 
+                            onClick={() => setViewMode("day")}
+                            disabled={isProcessing}
+                            className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-200 ${
+                                viewMode === "day" 
+                                    ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" 
+                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-50"
+                            }`}
+                        >
+                            Day
+                        </button>
+                        <button 
+                            onClick={() => setViewMode("week")}
+                            disabled={isProcessing}
+                            className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-200 ${
+                                viewMode === "week" 
+                                    ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" 
+                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-50"
+                            }`}
+                        >
+                            Week
+                        </button>
+                    </div>
+                )}
 
-                <div className="relative">
-                    <button 
-                        onClick={() => !isProcessing && setIsCalendarOpen(true)}
-                        className="p-2 bg-slate-100 dark:bg-slate-800 text-emerald-500 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 shadow-sm"
-                        title="Open Calendar"
-                    >
-                        <Calendar size={18} />
-                    </button>
+                {selectedDate && onDateChange && (
+                    <div className="relative">
+                        <button 
+                            onClick={() => !isProcessing && setIsCalendarOpen(true)}
+                            className="p-2 bg-slate-100 dark:bg-slate-800 text-emerald-500 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 shadow-sm"
+                            title="Open Calendar"
+                        >
+                            <Calendar size={18} />
+                        </button>
 
-                    <CalendarModal 
-                        isOpen={isCalendarOpen} 
-                        onClose={() => setIsCalendarOpen(false)} 
-                        currentDate={selectedDate instanceof Date ? selectedDate : selectedDate.start}
-                        onSelectDate={(d) => {
-                            if (d instanceof Date) {
-                                onDateChange({ start: d, end: d });
-                            } else {
-                                onDateChange(d);
-                            }
-                        }}
-                        viewMode={viewMode}
-                    />
-                </div>
+                        <CalendarModal 
+                            isOpen={isCalendarOpen} 
+                            onClose={() => setIsCalendarOpen(false)} 
+                            currentDate={selectedDate instanceof Date ? selectedDate : selectedDate.start}
+                            onSelectDate={(d) => {
+                                if (d instanceof Date) {
+                                    onDateChange({ start: d, end: d });
+                                } else {
+                                    onDateChange(d);
+                                }
+                            }}
+                            viewMode={viewMode || "day"}
+                        />
+                    </div>
+                )}
 
-                <div className="hidden md:flex items-center space-x-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-xl">
-                    <button 
-                        onClick={prevDate}
-                        disabled={isProcessing}
-                        className="p-1 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                    <button 
-                        onClick={() => !isProcessing && setIsCalendarOpen(true)}
-                        className="flex items-center space-x-3 px-3 py-1 text-[10px] font-black min-w-[160px] justify-center hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer uppercase tracking-[0.15em] border-x border-slate-100 dark:border-slate-800/50"
-                    >
-                        {isProcessing ? (
-                            <Loader2 size={14} className="animate-spin text-emerald-500" />
-                        ) : (
-                            <Calendar size={14} className="text-emerald-500" />
-                        )}
-                        <span>{formatDate(selectedDate)}</span>
-                        {mounted && isToday(selectedDate) && (
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                        )}
-                    </button>
-                    <button 
-                        onClick={nextDate}
-                        disabled={isProcessing}
-                        className="p-1 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
+                {selectedDate && (
+                    <div className="hidden md:flex items-center space-x-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-xl">
+                        <button 
+                            onClick={prevDate}
+                            disabled={isProcessing}
+                            className="p-1 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <button 
+                            onClick={() => !isProcessing && setIsCalendarOpen(true)}
+                            className="flex items-center space-x-3 px-3 py-1 text-[10px] font-black min-w-[160px] justify-center hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer uppercase tracking-[0.15em] border-x border-slate-100 dark:border-slate-800/50"
+                        >
+                            {isProcessing ? (
+                                <Loader2 size={14} className="animate-spin text-emerald-500" />
+                            ) : (
+                                <Calendar size={14} className="text-emerald-500" />
+                            )}
+                            <span>{formatDate(selectedDate)}</span>
+                            {mounted && isToday(selectedDate) && (
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            )}
+                        </button>
+                        <button 
+                            onClick={nextDate}
+                            disabled={isProcessing}
+                            className="p-1 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                )}
+
             </div>
 
             <div className="flex items-center space-x-3">

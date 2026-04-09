@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
     LayoutDashboard, 
     ShoppingCart, 
@@ -26,6 +26,7 @@ import {
     ChevronDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMounted } from "../../lib/hooks/useMounted";
 
 interface SidebarItemProps {
     icon: any;
@@ -93,21 +94,26 @@ const SidebarItem = ({ icon: Icon, label, href, active, collapsed, dropdown }: S
 };
 
 export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCollapsed: (val: boolean) => void }) {
+    const mounted = useMounted();
     const pathname = usePathname();
+    const router = useRouter();
     const [user, setUser] = useState<{ fullName: string } | null>(null);
 
     useEffect(() => {
+        if (!mounted) return;
         const storedUser = localStorage.getItem("user");
         if (storedUser) setUser(JSON.parse(storedUser));
-    }, []);
+    }, [mounted]);
+
+    if (!mounted) return null;
 
     const navItems = [
         { icon: LayoutDashboard, label: "Planner", href: "/dashboard" },
         { icon: ShoppingCart, label: "Groceries", href: "/dashboard/groceries" },
         { icon: Compass, label: "Discover", href: "/dashboard/discover" },
-        { icon: ChefHat, label: "Custom Recipes", href: "/dashboard/recipes" },
+        { icon: ChefHat, label: "Custom Recipes", href: "/dashboard/custom-recipes" },
         { icon: Library, label: "Collections", href: "/dashboard/collections" },
-        { icon: CalendarRange, label: "Saved Plans", href: "/dashboard/saved" },
+        { icon: CalendarRange, label: "Saved Plans", href: "/dashboard/saved-plans" },
     ];
 
     const dropdownItems = [

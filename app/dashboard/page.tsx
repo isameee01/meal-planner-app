@@ -8,7 +8,12 @@ import MealSection from "../../components/dashboard/MealSection";
 import NutritionPanel from "../../components/dashboard/NutritionPanel";
 import OnboardingModal from "./OnboardingModal";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useTheme } from "../../components/ThemeProvider";
+import { useMounted } from "../../lib/hooks/useMounted";
+import ClientOnly from "../../components/common/ClientOnly";
+import DataReady from "../../components/common/DataReady";
+import { SectionSkeleton, StatsSkeleton } from "../../components/common/Skeleton";
 
 // Define the requested state type
 type SelectedDateState = {
@@ -20,7 +25,7 @@ type SelectedDateState = {
 };
 
 export default function DashboardPage() {
-    const [mounted, setMounted] = useState(false);
+    const mounted = useMounted();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<{ fullName: string; email: string } | null>(null);
@@ -36,9 +41,8 @@ export default function DashboardPage() {
     const { theme, setTheme } = useTheme();
     const router = useRouter();
 
-    useEffect(() => {
-        setMounted(true);
 
+    useEffect(() => {
         const storedUser = localStorage.getItem("user");
         const authStatus = localStorage.getItem("isLoggedIn");
         const onboardingComplete = localStorage.getItem("onboardingComplete");
@@ -104,27 +108,18 @@ export default function DashboardPage() {
         localStorage.setItem("dashboard_selectedDate", JSON.stringify(date));
     };
 
-    if (!mounted) return null;
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-            </div>
-        );
-    }
-
-    if (!isLoggedIn || !user) {
-        router.push("/auth/login");
-        return null;
-    }
-
     // Adapt state for child components to avoid breaking them
     const legacySelectedDate = selectedDate.day || selectedDate.week?.start || new Date();
     const legacyDateRange = {
         start: selectedDate.week?.start || legacySelectedDate,
         end: selectedDate.week?.end || null
     };
+
+    if (!mounted) {
+        // We still need to handle the case where we redirect before mount if possible, 
+        // but usually we wait for mount to check localStorage accurately.
+    }
+
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors overflow-hidden">
@@ -160,43 +155,72 @@ export default function DashboardPage() {
                     isProcessing={isProcessing}
                 />
 
-                <div className="flex-1 p-4 lg:p-8 overflow-y-auto relative scrollbar-hide">
-                    <AnimatePresence>
-                        {showWelcome && (
-                            <motion.div 
-                                initial={{ opacity: 0, y: -20, x: "-50%" }}
-                                animate={{ opacity: 1, y: 10, x: "-50%" }}
-                                exit={{ opacity: 0, y: -20, x: "-50%" }}
-                                className="fixed top-20 left-1/2 z-[100] px-6 py-3 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-emerald-100 dark:border-emerald-900 flex items-center space-x-3 pointer-events-none"
-                            >
-                                <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white"><span>👋</span></div>
-                                <span className="font-bold text-slate-800 dark:text-slate-100">Welcome back, {user.fullName}</span>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    <div className="max-w-7xl mx-auto pb-20">
-                        <div className="flex flex-col lg:flex-row gap-8">
-                            <div className="flex-[2] space-y-8 min-w-0">
-                                <MealSection 
-                                    viewMode={viewMode}
-                                    selectedDate={legacySelectedDate}
-                                    dateRange={legacyDateRange}
-                                    setIsProcessing={setIsProcessing}
-                                    isProcessing={isProcessing}
-                                />
-                            </div>
-
-                            <div className="flex-1 lg:max-w-md">
-                                <NutritionPanel 
-                                    isProcessing={isProcessing} 
-                                    selectedDate={legacySelectedDate}
-                                    viewMode={viewMode}
-                                />
+                <ClientOnly fallback={
+                    <div className="flex-1 p-4 lg:p-8 space-y-8">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="flex flex-col lg:flex-row gap-8">
+                                <div className="flex-[2]"><SectionSkeleton /></div>
+                                <div className="flex-1 lg:max-w-md"><StatsSkeleton /></div>
                             </div>
                         </div>
                     </div>
-                </div>
+                }>
+                    <DataReady loading={loading} fallback={
+                        <div className="flex-1 p-4 lg:p-8 space-y-8">
+                            <div className="max-w-7xl mx-auto">
+                                <div className="flex flex-col lg:flex-row gap-8">
+                                    <div className="flex-[2]"><SectionSkeleton /></div>
+                                    <div className="flex-1 lg:max-w-md"><StatsSkeleton /></div>
+                                </div>
+                            </div>
+                        </div>
+                    }>
+                        {!isLoggedIn ? (
+                            <div className="flex-1 flex flex-col items-center justify-center">
+                                <Loader2 size={32} className="animate-spin text-emerald-500 mb-4" />
+                                <span className="font-black text-slate-400 uppercase tracking-widest">Redirecting to login...</span>
+                            </div>
+                        ) : (
+                            <div className="flex-1 p-4 lg:p-8 overflow-y-auto relative scrollbar-hide">
+                                <AnimatePresence>
+                                    {showWelcome && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: -20, x: "-50%" }}
+                                            animate={{ opacity: 1, y: 10, x: "-50%" }}
+                                            exit={{ opacity: 0, y: -20, x: "-50%" }}
+                                            className="fixed top-20 left-1/2 z-[100] px-6 py-3 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-emerald-100 dark:border-emerald-900 flex items-center space-x-3 pointer-events-none"
+                                        >
+                                            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white"><span>👋</span></div>
+                                            <span className="font-bold text-slate-800 dark:text-slate-100">Welcome back, {user?.fullName}</span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                <div className="max-w-7xl mx-auto pb-20">
+                                    <div className="flex flex-col lg:flex-row gap-8">
+                                        <div className="flex-[2] space-y-8 min-w-0">
+                                            <MealSection 
+                                                viewMode={viewMode}
+                                                selectedDate={legacySelectedDate}
+                                                dateRange={legacyDateRange}
+                                                setIsProcessing={setIsProcessing}
+                                                isProcessing={isProcessing}
+                                            />
+                                        </div>
+
+                                        <div className="flex-1 lg:max-w-md">
+                                            <NutritionPanel 
+                                                isProcessing={isProcessing} 
+                                                selectedDate={legacySelectedDate}
+                                                viewMode={viewMode}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </DataReady>
+                </ClientOnly>
             </main>
 
             <OnboardingModal />

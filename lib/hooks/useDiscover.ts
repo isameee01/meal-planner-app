@@ -64,7 +64,8 @@ export function useDiscover() {
         blockedFoods, 
         collections, 
         toggleSaveFood, 
-        blockFood 
+        blockFood,
+        loading: contextLoading
     } = useGlobalFoodState();
     
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
@@ -190,7 +191,7 @@ export function useDiscover() {
         resetFilters,
         isFiltered,
         displayFoods,
-        loading: false, // Now managed by context/initial load
+        loading: contextLoading,
         hasMore,
         loadMore,
         savedFoods,

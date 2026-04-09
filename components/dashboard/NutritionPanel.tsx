@@ -50,7 +50,7 @@ export default function NutritionPanel({ isProcessing, selectedDate, viewMode }:
     const getDateKey = (date: Date) => date.toISOString().split("T")[0];
 
     useEffect(() => {
-        setMounted(true);
+        if (!mounted) return;
         const checkPlan = () => {
             const cacheRaw = localStorage.getItem("meals_cache");
             if (!cacheRaw) {
@@ -93,7 +93,7 @@ export default function NutritionPanel({ isProcessing, selectedDate, viewMode }:
         checkPlan();
         window.addEventListener("storage", checkPlan);
         return () => window.removeEventListener("storage", checkPlan);
-    }, [selectedDate, isProcessing]); // Re-run when processing finishes
+    }, [selectedDate, isProcessing, mounted]); 
 
     const data = [
         { name: "Protein", value: stats.proteinPct, color: "#a855f7" },

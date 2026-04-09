@@ -27,6 +27,9 @@ import Header from "../../../components/dashboard/Header";
 import GroceryItemCard, { GroceryItem } from "../../../components/dashboard/GroceryItemCard";
 import OrderModal from "../../../components/dashboard/OrderModal";
 import { useTheme } from "../../../components/ThemeProvider";
+import ClientOnly from "../../../components/common/ClientOnly";
+import DataReady from "../../../components/common/DataReady";
+import { GridSkeleton, SectionSkeleton } from "../../../components/common/Skeleton";
 
 // --- RICH DATASET ---
 const INITIAL_GROCERIES: GroceryItem[] = [
@@ -227,72 +230,91 @@ export default function GroceriesPage() {
         return groups;
     }, [displayedItems]);
 
-    if (!mounted) return null;
+    const isLoading = !mounted; // Using mounted as a proxy for loading since it loads from localStorage on mount
 
     return (
+
         <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 flex overflow-hidden font-sans">
             <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
             <main className={`flex-1 flex flex-col min-w-0 transition-all duration-300 h-screen overflow-hidden ${collapsed ? "lg:ml-[80px]" : "lg:ml-[280px]"}`}>
                 <Header toggleMobileMenu={() => setMobileMenuOpen(true)} viewMode="day" setViewMode={() => {}} selectedDate={new Date()} onDateChange={() => {}} theme={theme} onThemeChange={setTheme} isProcessing={isGenerating} />
-                <div className="flex-1 p-4 lg:p-8 overflow-y-auto relative scrollbar-hide">
-                    <div className="max-w-7xl mx-auto pb-24">
-                        <div className="fixed bottom-8 right-8 z-[110] flex flex-col space-y-3">
-                            <AnimatePresence>
-                                {toasts.map(t => (
-                                    <motion.div key={t.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className={`flex items-center px-4 py-3 rounded-2xl shadow-2xl border ${t.type === "success" ? "bg-emerald-500 text-white border-emerald-400" : "bg-slate-800 text-white border-slate-700"}`}>
-                                        {t.type === "success" ? <CheckCircle2 size={16} className="mr-2" /> : <Info size={16} className="mr-2 text-emerald-400" />}
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{t.message}</span>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
+                <ClientOnly fallback={
+                    <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
+                        <div className="max-w-7xl mx-auto space-y-12">
+                            <SectionSkeleton />
+                            <GridSkeleton count={8} type="card" />
                         </div>
-                        <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
-                            <div>
-                                <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 italic uppercase">Procurement <ShoppingCart size={28} className="inline-block ml-2 text-emerald-500 fill-emerald-500" /></h1>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{activeTab === "groceries" ? "Weekly Shopping List" : "Pantry Inventory"}</p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <button onClick={() => generateFromPlanner(groceries.length > 0)} className="px-5 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500"><RefreshCcw size={14} className={`inline mr-2 ${isGenerating ? "animate-spin" : ""}`} /> Sync Planner</button>
-                                <button disabled={activeTab !== "groceries" || groceries.length === 0} onClick={() => setIsOrderModalOpen(true)} className="px-6 py-3 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50">Order Selection <ArrowUpRight size={16} className="inline ml-2" /></button>
-                            </div>
-                        </div>
-                        <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md py-4 rounded-3xl mb-12 border-b border-slate-200/40 dark:border-slate-800/40 px-4 flex flex-col sm:flex-row justify-between gap-4">
-                            <div className="flex bg-[#f1f5f9] dark:bg-slate-900 p-1 rounded-2xl border border-slate-200/50">
-                                <button onClick={() => { setActiveTab("groceries"); setSelection(new Set()); }} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === "groceries" ? "bg-slate-800 text-white" : "text-slate-500"}`}><Package size={14} className="inline mr-2" /> Shopping</button>
-                                <button onClick={() => { setActiveTab("pantry"); setSelection(new Set()); }} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === "pantry" ? "bg-slate-800 text-white" : "text-slate-500"}`}><Archive size={14} className="inline mr-2" /> Pantry</button>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="relative flex-1 sm:w-64"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder={`Search...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-bold" /></div>
-                                <button onClick={() => setSelection(new Set(selection.size === displayedItems.length ? [] : displayedItems.map(i => i.id)))} disabled={displayedItems.length === 0} className="p-3 bg-white dark:bg-slate-900 border border-slate-200 rounded-2xl text-slate-400"><CheckSquare size={18} /></button>
-                                <AnimatePresence>{selection.size > 0 && (
-                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex space-x-2">
-                                        <button onClick={() => moveBetween(activeTab === "groceries" ? "toPantry" : "toGroceries")} className="p-3 bg-emerald-500 text-white rounded-2xl shadow-lg"><ArrowLeftRight size={18} /></button>
-                                        <button onClick={removeSelected} className="p-3 bg-red-500 text-white rounded-2xl shadow-lg"><Trash2 size={18} /></button>
-                                    </motion.div>
-                                )}</AnimatePresence>
-                            </div>
-                        </div>
-                        {activeTab === "pantry" && (
-                            <div className="mb-16">
-                                <div className="flex items-center space-x-3 mb-6 px-2"><Zap size={18} className="text-yellow-500 fill-yellow-500" /><h2 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest italic">Quick Add Suggestions</h2><div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" /></div>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">{SUGGESTIONS.map(sug => (
-                                    <button key={sug.id} onClick={() => !pantry.some(p => p.name === sug.name) && addItemToList(sug, "pantry")} disabled={pantry.some(p => p.name === sug.name)} className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl flex items-center justify-between disabled:opacity-50"><div className="min-w-0"><p className="text-[10px] font-black text-slate-800 dark:text-slate-100 truncate uppercase">{sug.name}</p><p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{sug.category}</p></div><div className={`p-1.5 rounded-lg ${pantry.some(p => p.name === sug.name) ? "text-slate-300" : "text-emerald-600 bg-emerald-50"}`}><PlusCircle size={12} /></div></button>
-                                ))}</div>
-                            </div>
-                        )}
-                        <AnimatePresence mode="wait">
-                            {isGenerating ? (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32"><Loader2 size={64} className="text-emerald-500 animate-spin" /><p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-6">Syncing Planner...</p></motion.div>
-                            ) : displayedItems.length === 0 ? (
-                                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-slate-900 rounded-[48px] border border-slate-100 shadow-xl"><div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-200 mb-8">{activeTab === "groceries" ? <ShoppingCart size={48} /> : <Archive size={48} />}</div><h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 italic uppercase">Your {activeTab} is empty</h3><button onClick={() => activeTab === "groceries" ? generateFromPlanner() : setActiveTab("groceries")} className="px-10 py-5 bg-slate-900 dark:bg-emerald-500 text-white rounded-[24px] text-[10px] font-black uppercase tracking-widest mt-10 hover:scale-105 active:scale-95 transition-all shadow-2xl">{activeTab === "groceries" ? "Sync From Planner" : "Add From Groceries"}</button></motion.div>
-                            ) : (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-16">{Object.keys(groupedItems).sort().map(cat => (
-                                    <div key={cat}><div className="flex items-center space-x-4 mb-8 px-2"><div className="pl-4 pr-6 py-2 bg-slate-800 rounded-2xl shadow-xl"><h2 className="text-[10px] font-black text-white uppercase tracking-widest italic">{cat} <span className="ml-3 text-emerald-400 opacity-60">[{groupedItems[cat].length}]</span></h2></div><div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{groupedItems[cat].map(item => (<GroceryItemCard key={item.id} item={item} selected={selection.has(item.id)} onToggle={toggleSelection} onUpdate={updateItem} />))}</div></div>
-                                ))}</motion.div>
-                            )}
-                        </AnimatePresence>
                     </div>
-                </div>
+                }>
+                    <DataReady loading={isLoading} fallback={
+                        <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
+                            <div className="max-w-7xl mx-auto space-y-12">
+                                <SectionSkeleton />
+                                <GridSkeleton count={8} type="card" />
+                            </div>
+                        </div>
+                    }>
+                        <div className="flex-1 p-4 lg:p-8 overflow-y-auto relative scrollbar-hide">
+                            <div className="max-w-7xl mx-auto pb-24">
+                                <div className="fixed bottom-8 right-8 z-[110] flex flex-col space-y-3">
+                                    <AnimatePresence>
+                                        {toasts.map(t => (
+                                            <motion.div key={t.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className={`flex items-center px-4 py-3 rounded-2xl shadow-2xl border ${t.type === "success" ? "bg-emerald-500 text-white border-emerald-400" : "bg-slate-800 text-white border-slate-700"}`}>
+                                                {t.type === "success" ? <CheckCircle2 size={16} className="mr-2" /> : <Info size={16} className="mr-2 text-emerald-400" />}
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{t.message}</span>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                                <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
+                                    <div>
+                                        <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 italic uppercase">Procurement <ShoppingCart size={28} className="inline-block ml-2 text-emerald-500 fill-emerald-500" /></h1>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{activeTab === "groceries" ? "Weekly Shopping List" : "Pantry Inventory"}</p>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => generateFromPlanner(groceries.length > 0)} className="px-5 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500"><RefreshCcw size={14} className={`inline mr-2 ${isGenerating ? "animate-spin" : ""}`} /> Sync Planner</button>
+                                        <button disabled={activeTab !== "groceries" || groceries.length === 0} onClick={() => setIsOrderModalOpen(true)} className="px-6 py-3 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50">Order Selection <ArrowUpRight size={16} className="inline ml-2" /></button>
+                                    </div>
+                                </div>
+                                <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md py-4 rounded-3xl mb-12 border-b border-slate-200/40 dark:border-slate-800/40 px-4 flex flex-col sm:flex-row justify-between gap-4">
+                                    <div className="flex bg-[#f1f5f9] dark:bg-slate-900 p-1 rounded-2xl border border-slate-200/50">
+                                        <button onClick={() => { setActiveTab("groceries"); setSelection(new Set()); }} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === "groceries" ? "bg-slate-800 text-white" : "text-slate-500"}`}><Package size={14} className="inline mr-2" /> Shopping</button>
+                                        <button onClick={() => { setActiveTab("pantry"); setSelection(new Set()); }} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === "pantry" ? "bg-slate-800 text-white" : "text-slate-500"}`}><Archive size={14} className="inline mr-2" /> Pantry</button>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="relative flex-1 sm:w-64"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder={`Search...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-bold" /></div>
+                                        <button onClick={() => setSelection(new Set(selection.size === displayedItems.length ? [] : displayedItems.map(i => i.id)))} disabled={displayedItems.length === 0} className="p-3 bg-white dark:bg-slate-900 border border-slate-200 rounded-2xl text-slate-400"><CheckSquare size={18} /></button>
+                                        <AnimatePresence>{selection.size > 0 && (
+                                            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex space-x-2">
+                                                <button onClick={() => moveBetween(activeTab === "groceries" ? "toPantry" : "toGroceries")} className="p-3 bg-emerald-500 text-white rounded-2xl shadow-lg"><ArrowLeftRight size={18} /></button>
+                                                <button onClick={removeSelected} className="p-3 bg-red-500 text-white rounded-2xl shadow-lg"><Trash2 size={18} /></button>
+                                            </motion.div>
+                                        )}</AnimatePresence>
+                                    </div>
+                                </div>
+                                {activeTab === "pantry" && (
+                                    <div className="mb-16">
+                                        <div className="flex items-center space-x-3 mb-6 px-2"><Zap size={18} className="text-yellow-500 fill-yellow-500" /><h2 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest italic">Quick Add Suggestions</h2><div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" /></div>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">{SUGGESTIONS.map(sug => (
+                                            <button key={sug.id} onClick={() => !pantry.some(p => p.name === sug.name) && addItemToList(sug, "pantry")} disabled={pantry.some(p => p.name === sug.name)} className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl flex items-center justify-between disabled:opacity-50"><div className="min-w-0"><p className="text-[10px] font-black text-slate-800 dark:text-slate-100 truncate uppercase">{sug.name}</p><p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{sug.category}</p></div><div className={`p-1.5 rounded-lg ${pantry.some(p => p.name === sug.name) ? "text-slate-300" : "text-emerald-600 bg-emerald-50"}`}><PlusCircle size={12} /></div></button>
+                                        ))}</div>
+                                    </div>
+                                )}
+                                <AnimatePresence mode="wait">
+                                    {isGenerating ? (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32"><Loader2 size={64} className="text-emerald-500 animate-spin" /><p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-6">Syncing Planner...</p></motion.div>
+                                    ) : displayedItems.length === 0 ? (
+                                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-slate-900 rounded-[48px] border border-slate-100 shadow-xl"><div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-200 mb-8">{activeTab === "groceries" ? <ShoppingCart size={48} /> : <Archive size={48} />}</div><h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 italic uppercase">Your {activeTab} is empty</h3><button onClick={() => activeTab === "groceries" ? generateFromPlanner() : setActiveTab("groceries")} className="px-10 py-5 bg-slate-900 dark:bg-emerald-500 text-white rounded-[24px] text-[10px] font-black uppercase tracking-widest mt-10 hover:scale-105 active:scale-95 transition-all shadow-2xl">{activeTab === "groceries" ? "Sync From Planner" : "Add From Groceries"}</button></motion.div>
+                                    ) : (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-16">{Object.keys(groupedItems).sort().map(cat => (
+                                            <div key={cat}><div className="flex items-center space-x-4 mb-8 px-2"><div className="pl-4 pr-6 py-2 bg-slate-800 rounded-2xl shadow-xl"><h2 className="text-[10px] font-black text-white uppercase tracking-widest italic">{cat} <span className="ml-3 text-emerald-400 opacity-60">[{groupedItems[cat].length}]</span></h2></div><div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" /></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{groupedItems[cat].map(item => (<GroceryItemCard key={item.id} item={item} selected={selection.has(item.id)} onToggle={toggleSelection} onUpdate={updateItem} />))}</div></div>
+                                        ))}</motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+                    </DataReady>
+                </ClientOnly>
             </main>
             <OrderModal isOpen={isOrderModalOpen} onClose={() => setIsOrderModalOpen(false)} selectedItems={groceries.filter(i => selection.has(i.id)).map(i => i.name)} />
         </div>
