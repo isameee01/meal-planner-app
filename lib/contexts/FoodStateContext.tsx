@@ -41,8 +41,17 @@ export function FoodStateProvider({ children }: { children: React.ReactNode }) {
         const storedSaved = localStorage.getItem("discover_savedFoods");
         if (storedSaved) setSavedFoods(JSON.parse(storedSaved));
 
-        const storedBlocked = localStorage.getItem("discover_blockedFoods");
-        if (storedBlocked) setBlockedFoods(JSON.parse(storedBlocked));
+        // Migration logic: Check new key first, then fallback to old key
+        const storedBlocked = localStorage.getItem("blocked_foods");
+        const legacyBlocked = localStorage.getItem("discover_blockedFoods");
+        
+        if (storedBlocked) {
+            setBlockedFoods(JSON.parse(storedBlocked));
+        } else if (legacyBlocked) {
+            setBlockedFoods(JSON.parse(legacyBlocked));
+            // Move it to new key immediately
+            localStorage.setItem("blocked_foods", legacyBlocked);
+        }
 
         const storedFavorites = localStorage.getItem("discover_favoriteFoods");
         if (storedFavorites) setFavoriteFoods(JSON.parse(storedFavorites));
@@ -57,16 +66,18 @@ export function FoodStateProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!isLoaded) return;
         localStorage.setItem("discover_savedFoods", JSON.stringify(savedFoods));
-        localStorage.setItem("discover_blockedFoods", JSON.stringify(blockedFoods));
+        localStorage.setItem("blocked_foods", JSON.stringify(blockedFoods));
         localStorage.setItem("discover_favoriteFoods", JSON.stringify(favoriteFoods));
         localStorage.setItem("discover_collections", JSON.stringify(collections));
     }, [savedFoods, blockedFoods, favoriteFoods, collections, isLoaded]);
+
+    const normalize = (str: string) => str.toLowerCase().trim();
 
     // Cross-tab Sync
     useEffect(() => {
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === "discover_savedFoods" && e.newValue) setSavedFoods(JSON.parse(e.newValue));
-            if (e.key === "discover_blockedFoods" && e.newValue) setBlockedFoods(JSON.parse(e.newValue));
+            if (e.key === "blocked_foods" && e.newValue) setBlockedFoods(JSON.parse(e.newValue));
             if (e.key === "discover_favoriteFoods" && e.newValue) setFavoriteFoods(JSON.parse(e.newValue));
             if (e.key === "discover_collections" && e.newValue) setCollections(JSON.parse(e.newValue));
         };
@@ -84,12 +95,17 @@ export function FoodStateProvider({ children }: { children: React.ReactNode }) {
         setFavoriteFoods(prev => prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]);
     }, []);
 
-    const blockFood = useCallback((id: string) => {
-        setBlockedFoods(prev => prev.includes(id) ? prev : [...prev, id]);
+    const blockFood = useCallback((idOrName: string) => {
+        const normalized = idOrName.toLowerCase().trim();
+        setBlockedFoods(prev => {
+            if (prev.map(f => f.toLowerCase().trim()).includes(normalized)) return prev;
+            return [...prev, idOrName];
+        });
     }, []);
 
-    const unblockFood = useCallback((id: string) => {
-        setBlockedFoods(prev => prev.filter(fId => fId !== id));
+    const unblockFood = useCallback((idOrName: string) => {
+        const normalized = idOrName.toLowerCase().trim();
+        setBlockedFoods(prev => prev.filter(f => f.toLowerCase().trim() !== normalized));
     }, []);
 
     const createCollection = useCallback((name: string) => {

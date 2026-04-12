@@ -3,6 +3,9 @@
 import { useState, useMemo, useCallback } from "react";
 import { FULL_DISCOVER_DATABASE, FoodItem, FoodCategory, MealType } from "../discover-db";
 import { useGlobalFoodState } from "../contexts/FoodStateContext";
+import { usePrimaryDiet } from "./usePrimaryDiet";
+import { useFoodExclusions } from "./useFoodExclusions";
+import { filterFoods } from "../utils/filterEngine";
 
 export interface FilterState {
     query: string;
@@ -71,6 +74,7 @@ export function useDiscover() {
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
     const [page, setPage] = useState(1);
     const aiScores = useAIRecommendations(filters.aiEnabled);
+    const { activeDiet } = usePrimaryDiet();
 
     // Reset logic
     const isFiltered = useMemo(() => {
@@ -82,13 +86,15 @@ export function useDiscover() {
         setPage(1);
     }, []);
 
+    const { exclusions } = useFoodExclusions();
+
     // Filter Logic
     const filteredFoods = useMemo(() => {
         let result = FULL_DISCOVER_DATABASE.filter(food => {
-            // Global Exclusion (Blocked)
-            if (blockedFoods.includes(food.id)) return false;
+            // 1. Detailed Diet, Exclusions & Blocked Foods Filter using robust engine
+            if (!filterFoods(food, exclusions, activeDiet, blockedFoods)) return false;
 
-            // 1. Search filter
+            // 2. Search filter
             if (filters.query) {
                 const q = filters.query.toLowerCase();
                 const nameMatch = food.name.toLowerCase().includes(q);
@@ -96,12 +102,12 @@ export function useDiscover() {
                 if (!nameMatch && !descMatch) return false;
             }
 
-            // 2. Category filter
+            // 3. Category filter
             if (filters.categories.length > 0 && !filters.categories.includes(food.category)) {
                 return false;
             }
 
-            // 3. Collection filter
+            // 4. Collection filter
             if (filters.selectedCollectionId) {
                 const collection = collections.find(c => c.id === filters.selectedCollectionId);
                 if (collection && !collection.foodIds.includes(food.id)) return false;
@@ -112,13 +118,13 @@ export function useDiscover() {
                 if (!isInAnyCollection) return false;
             }
 
-            // 4. Excluded foods filter
+            // 5. Excluded foods block (local filter state array)
             if (filters.excludedFoods.length > 0) {
                 const nameMatch = filters.excludedFoods.some(ex => food.name.toLowerCase().includes(ex.toLowerCase()));
                 if (nameMatch) return false;
             }
 
-            // 5. Nutrition Focus filter (STRICT AND LOGIC)
+            // 6. Nutrition Focus filter (STRICT AND LOGIC)
             if (filters.nutritionFocus.length > 0) {
                 // Safe Data Access
                 const p = food.nutrition?.protein ?? 0;
@@ -169,7 +175,7 @@ export function useDiscover() {
         }
 
         return result;
-    }, [filters, savedFoods, blockedFoods, collections, aiScores]);
+    }, [filters, savedFoods, blockedFoods, collections, aiScores, activeDiet, exclusions]);
 
     // Paginated Foods
     const displayFoods = useMemo(() => {

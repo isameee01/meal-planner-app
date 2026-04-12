@@ -170,6 +170,13 @@ export default function FoodCard({
                     >
                         <Heart size={20} fill={favorited ? "currentColor" : "none"} />
                     </button>
+                    <button 
+                        onClick={() => blockFood(food.name)}
+                        className="p-2.5 bg-white/90 backdrop-blur-md text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-lg"
+                        title="Block this food"
+                    >
+                        <Ban size={20} />
+                    </button>
                 </div>
 
                 <div className="absolute bottom-3 left-3">

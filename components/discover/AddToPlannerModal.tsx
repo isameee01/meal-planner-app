@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { X, Calendar, Clock, CheckCircle2, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Calendar, Clock, CheckCircle2, ChevronRight, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FoodItem } from "../../lib/discover-db";
+import { useFoodExclusions } from "../../lib/hooks/useFoodExclusions";
+import { usePrimaryDiet } from "../../lib/hooks/usePrimaryDiet";
+import { filterFoods } from "../../lib/utils/filterEngine";
+import { useGlobalFoodState } from "../../lib/contexts/FoodStateContext";
 
 interface AddToPlannerModalProps {
     isOpen: boolean;
@@ -12,14 +16,44 @@ interface AddToPlannerModalProps {
 }
 
 export default function AddToPlannerModal({ isOpen, onClose, food }: AddToPlannerModalProps) {
+    const { blockedFoods } = useGlobalFoodState();
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSlot, setSelectedSlot] = useState("Lunch");
     const [isSuccess, setIsSuccess] = useState(false);
+    
+    const { exclusions } = useFoodExclusions();
+    const { activeDiet } = usePrimaryDiet();
+    const [isExcludedWarning, setIsExcludedWarning] = useState(false);
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [hasOverridden, setHasOverridden] = useState(false);
 
     const slots = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
+    useEffect(() => {
+        if (isOpen && food) {
+            const isAllowed = filterFoods(food, exclusions, activeDiet, blockedFoods);
+            if (!isAllowed) {
+                // Determine if it's a hard block or just an exclusion/diet mismatch
+                const normalize = (s: string) => s.toLowerCase().trim();
+                const isHardBlocked = blockedFoods.some(b => normalize(b) === normalize(food.name)) || blockedFoods.includes(food.id);
+                
+                setIsBlocked(isHardBlocked);
+                setIsExcludedWarning(true);
+            } else {
+                setIsExcludedWarning(false);
+                setIsBlocked(false);
+            }
+            setHasOverridden(false);
+        }
+    }, [isOpen, food, exclusions, activeDiet, blockedFoods]);
+
     const handleAdd = () => {
         if (!food) return;
+
+        if (isExcludedWarning && !hasOverridden) {
+            // Already showing warning, do not proceed if not overridden
+            return;
+        }
 
         const cacheRaw = localStorage.getItem("meals_cache");
         let cache = cacheRaw ? JSON.parse(cacheRaw) : {};
@@ -104,6 +138,36 @@ export default function AddToPlannerModal({ isOpen, onClose, food }: AddToPlanne
                                 <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic">Added to Plan!</h3>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium">Successfully added {food.name} to your {selectedSlot}.</p>
                             </div>
+                        ) : isExcludedWarning && !hasOverridden ? (
+                            <div className="py-6 flex flex-col space-y-6 text-center">
+                                <div className={`w-20 h-20 ${isBlocked ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-500' : 'bg-orange-100 dark:bg-orange-900/30 text-orange-500'} rounded-full flex items-center justify-center mx-auto`}>
+                                    <AlertTriangle size={36} />
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase">{isBlocked ? 'Food Blocked' : 'Food Excluded'}</h3>
+                                <p className="text-slate-500 dark:text-slate-400 font-medium">
+                                    {isBlocked 
+                                        ? "This food is permanently blocked in your settings. You can still add it, but we recommend checking your Blocked Foods list."
+                                        : "This food is excluded based on your Primary Diet or Custom Exclusions preferences. "
+                                    }
+                                </p>
+                                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-3xl text-sm font-bold border border-slate-200 dark:border-slate-800">
+                                    {food.name}
+                                </div>
+                                <div className="flex gap-4 pt-4">
+                                    <button 
+                                        onClick={onClose}
+                                        className="flex-1 px-6 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-[2rem] font-bold transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={() => setHasOverridden(true)}
+                                        className={`flex-1 px-6 py-4 ${isBlocked ? 'bg-rose-600' : 'bg-rose-500'} hover:opacity-90 text-white rounded-[2rem] font-bold shadow-lg transition-all`}
+                                    >
+                                        {isBlocked ? 'Override Block' : 'Allow Anyway'}
+                                    </button>
+                                </div>
+                            </div>
                         ) : (
                             <div className="space-y-8">
                                 <div className="flex items-center justify-between">
@@ -161,9 +225,11 @@ export default function AddToPlannerModal({ isOpen, onClose, food }: AddToPlanne
 
                                 <button 
                                     onClick={handleAdd}
-                                    className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-200/50 dark:shadow-emerald-900/20 transition-all hover:scale-[1.02] active:scale-95 mt-4"
+                                    className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-[2rem] font-black uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-95 mt-4 ${
+                                        hasOverridden ? "bg-rose-500 hover:bg-rose-600 text-white shadow-xl shadow-rose-200/50 dark:shadow-rose-900/20" : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-200/50 dark:shadow-emerald-900/20"
+                                    }`}
                                 >
-                                    <span>Confirm Selection</span>
+                                    <span>{hasOverridden ? "Override & Add" : "Confirm Selection"}</span>
                                     <ChevronRight size={20} />
                                 </button>
                             </div>

@@ -122,9 +122,10 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
             label: "Diet & Nutrition", 
             href: "#",
             dropdown: [
-                { label: "Macronutrients", href: "/dashboard/macros" },
-                { label: "Micronutrients", href: "/dashboard/micros" },
-                { label: "Diet Type", href: "/dashboard/diet-type" }
+                { label: "Nutrition Targets", href: "/dashboard/diet-nutrition/nutrition-targets" },
+                { label: "Primary Diet", href: "/dashboard/diet-nutrition/primary-diet" },
+                { label: "Food Exclusions", href: "/dashboard/diet-nutrition/food-exclusions" },
+                { label: "Blocked Foods", href: "/dashboard/diet-nutrition/blocked-foods" }
             ]
         },
         { 
