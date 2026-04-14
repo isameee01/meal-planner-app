@@ -3,9 +3,20 @@
 import { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { motion } from "framer-motion";
+import { useGeneratorSettings } from "../../lib/hooks/useGeneratorSettings";
 
 export default function NutritionChart({ selectedDate }: { selectedDate: Date | { start: Date, end: Date | null } }) {
-    const [stats, setStats] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+    const { settings, getEnergyValue, getCarbsValue } = useGeneratorSettings();
+    const [stats, setStats] = useState({
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        proteinPct: 30,
+        carbPct: 40,
+        fatPct: 30
+    });
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -22,7 +33,7 @@ export default function NutritionChart({ selectedDate }: { selectedDate: Date | 
                 const dateKey = targetDate.toISOString().split("T")[0];
                 const dayMeals = cache[dateKey] || [];
                 
-                let calories = 0, protein = 0, carbs = 0, fat = 0;
+                let calories = 0, protein = 0, carbs = 0, fat = 0, fiber = 0;
                 
                 dayMeals.forEach((meal: any) => {
                     meal.items.forEach((item: any) => {
@@ -30,6 +41,7 @@ export default function NutritionChart({ selectedDate }: { selectedDate: Date | 
                         protein += (item.food.protein || 0) * item.amount;
                         carbs += (item.food.carbs || 0) * item.amount;
                         fat += (item.food.fat || 0) * item.amount;
+                        fiber += (item.food.fiber || 0) * item.amount;
                     });
                 });
                 
@@ -37,7 +49,8 @@ export default function NutritionChart({ selectedDate }: { selectedDate: Date | 
                     calories: Math.round(calories), 
                     protein: Math.round(protein), 
                     carbs: Math.round(carbs), 
-                    fat: Math.round(fat) 
+                    fat: Math.round(fat),
+                    fiber: Math.round(fiber)
                 });
             } catch (e) {
                 console.error("Error parsing stats", e);
@@ -85,8 +98,12 @@ export default function NutritionChart({ selectedDate }: { selectedDate: Date | 
                 </ResponsiveContainer>
                 
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{stats.calories}</span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">KCAL</span>
+                    <span className="text-3xl font-black text-slate-900 dark:text-slate-100 italic">
+                        {getEnergyValue(stats.calories).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">
+                        {settings.energyUnit}
+                    </span>
                 </div>
             </div>
 
@@ -96,8 +113,12 @@ export default function NutritionChart({ selectedDate }: { selectedDate: Date | 
                     <p className="text-sm font-black text-slate-800 dark:text-slate-200">{stats.protein}g</p>
                 </div>
                 <div className="text-center p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-900/20">
-                    <p className="text-[10px] font-black text-blue-500 uppercase leading-none mb-1">Carbs</p>
-                    <p className="text-sm font-black text-slate-800 dark:text-slate-200">{stats.carbs}g</p>
+                    <p className="text-[10px] font-black text-blue-500 uppercase leading-none mb-1">
+                        {settings.carbsType === "net" ? "Net Carbs" : "Total Carbs"}
+                    </p>
+                    <p className="text-sm font-black text-slate-800 dark:text-slate-200">
+                        {getCarbsValue(stats.carbs, stats.fiber)}g
+                    </p>
                 </div>
                 <div className="text-center p-3 rounded-2xl bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100/50 dark:border-orange-900/20">
                     <p className="text-[10px] font-black text-orange-500 uppercase leading-none mb-1">Fats</p>

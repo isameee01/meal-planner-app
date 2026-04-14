@@ -38,10 +38,23 @@ export function useNutritionTargets() {
             if (e.key === STORAGE_KEY) {
                 loadTargets();
             }
+            if (e.key === "user_stats") {
+                // When stats change, we might want to refresh targets
+                loadTargets();
+            }
+        };
+
+        const handleCustomEvent = () => {
+            loadTargets();
         };
 
         window.addEventListener("storage", handleStorageChange);
-        return () => window.removeEventListener("storage", handleStorageChange);
+        window.addEventListener("user_stats_updated", handleCustomEvent);
+        
+        return () => {
+            window.removeEventListener("storage", handleStorageChange);
+            window.removeEventListener("user_stats_updated", handleCustomEvent);
+        };
     }, [loadTargets]);
 
     const addTarget = (input: CreateNutritionTargetInput) => {
@@ -90,31 +103,95 @@ export function useNutritionTargets() {
 }
 
 export function generateTargetFromProfile(): NutritionTarget {
-    let weight = 70; // default 70kg
-    let goal = 'maintain';
+    let weight = 70; 
+    let heightCm = 175;
+    let age = 30;
+    let sex: "male" | "female" = "male";
+    let activityMultiplier = 1.2;
     
+    // Default goal state
+    let goalMode: "general" | "exact" = "general";
+    let goalType: "lose" | "maintain" | "gain" = "maintain";
+    let targetWeightKg = 70;
+    let weeklyChangeKg = 0.5;
+
     try {
-        const profileStr = localStorage.getItem("user_profile");
-        if (profileStr) {
-            const profile = JSON.parse(profileStr);
-            if (profile.weight) weight = Number(profile.weight);
-            if (profile.goal) goal = profile.goal;
+        const statsStr = localStorage.getItem("user_stats");
+        if (statsStr) {
+            const stats = JSON.parse(statsStr);
+            if (stats.weight) weight = Number(stats.weight);
+            if (stats.age) age = Number(stats.age);
+            if (stats.sex) sex = (stats.sex === "female" ? "female" : "male");
+            
+            if (stats.height) {
+                heightCm = (stats.height.ft * 30.48) + (stats.height.in * 2.54);
+            }
+
+            const multipliers: Record<string, number> = {
+                "sedentary": 1.2,
+                "lightly_active": 1.375,
+                "moderately_active": 1.55,
+                "very_active": 1.725,
+                "extra_active": 1.725
+            };
+            activityMultiplier = multipliers[stats.activityLevel] || 1.2;
+        }
+
+        const goalStr = localStorage.getItem("user_goal");
+        if (goalStr) {
+            const userGoal = JSON.parse(goalStr);
+            goalMode = userGoal.goalMode || "general";
+            goalType = userGoal.goalType || "maintain";
+            targetWeightKg = userGoal.targetWeightKg || weight;
+            weeklyChangeKg = userGoal.weeklyChangeKg || 0.5;
+        } else {
+            // Fallback to old user_profile if exists
+            const profileStr = localStorage.getItem("user_profile");
+            if (profileStr) {
+                const profile = JSON.parse(profileStr);
+                if (profile.goal === "lose") goalType = "lose";
+                if (profile.goal === "gain") goalType = "gain";
+            }
         }
     } catch(e) {
-        // ignore
+        console.error("Error parsing profile for nutrition target:", e);
     }
 
-    let calories = weight * 26;
-    if (goal === 'lose') calories = weight * 22;
-    if (goal === 'gain') calories = weight * 30;
+    // 1. Calculate BMR (Mifflin-St Jeor)
+    let bmr = (10 * weight) + (6.25 * heightCm) - (5 * age);
+    if (sex === "male") bmr += 5;
+    else bmr -= 161;
 
+    // 2. Calculate TDEE
+    let tdee = bmr * activityMultiplier;
+
+    // 3. Apply Goal Adjustment
+    let calories = tdee;
+    if (goalMode === "general") {
+        if (goalType === "lose") calories -= 400;
+        if (goalType === "gain") calories += 300;
+    } else {
+        const dailyAdjustment = (weeklyChangeKg * 7700) / 7;
+        if (targetWeightKg < weight) {
+            calories -= dailyAdjustment;
+        } else if (targetWeightKg > weight) {
+            calories += dailyAdjustment;
+        }
+    }
+
+    // Ensure calories don't drop to dangerous levels
+    calories = Math.max(1200, Math.round(calories));
+
+    // 4. Macro Distribution (Standard balanced: 30% Protein, 25% Fat, 45% Carbs)
+    // Protein: 1.8g per kg is a better rule of thumb for active people
     const proteinGrams = weight * 1.8;
-    const proteinPct = (proteinGrams * 4) / calories * 100;
+    const proteinCalories = proteinGrams * 4;
+    const proteinPct = (proteinCalories / calories) * 100;
     
     const fatsPct = 25;
     const carbsPct = Math.max(0, 100 - proteinPct - fatsPct);
 
-    // Ranges as specified
+    // Ranges
     const pMin = Math.round(proteinPct * 0.9);
     const pMax = Math.round(proteinPct * 1.2);
     
@@ -134,7 +211,7 @@ export function generateTargetFromProfile(): NutritionTarget {
         fatsMax: fMax,
         proteinMin: pMin,
         proteinMax: pMax,
-        fiber: 30, // defaults
+        fiber: 30,
         sodium: 2300,
         cholesterol: 300,
         createdAt: new Date().toISOString()

@@ -8,9 +8,11 @@ import {
     Copy, 
     PlusSquare, 
     Trash2,
-    PieChart as PieChartIcon
+    PieChart as PieChartIcon,
+    Zap
 } from "lucide-react";
 import DropdownMenu from "./DropdownMenu";
+import { useGeneratorSettings } from "../../lib/hooks/useGeneratorSettings";
 
 const StatsItem = ({ emoji, label, value, unit }: { emoji: string; label: string; value: string | number; unit: string }) => (
     <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group cursor-default text-slate-800 dark:text-slate-200 font-medium">
@@ -34,6 +36,8 @@ interface NutritionPanelProps {
 }
 
 export default function NutritionPanel({ isProcessing, selectedDate, viewMode }: NutritionPanelProps) {
+    const { settings, getEnergyValue, getCarbsValue } = useGeneratorSettings();
+
     const [mounted, setMounted] = useState(false);
     const [hasPlan, setHasPlan] = useState(false);
     const [stats, setStats] = useState({
@@ -48,6 +52,10 @@ export default function NutritionPanel({ isProcessing, selectedDate, viewMode }:
     });
 
     const getDateKey = (date: Date) => date.toISOString().split("T")[0];
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         if (!mounted) return;
@@ -174,8 +182,12 @@ export default function NutritionPanel({ isProcessing, selectedDate, viewMode }:
                             </ResponsiveContainer>
                             
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-3xl font-black text-slate-900 dark:text-slate-100">{stats.calories.toLocaleString()}</span>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">KCAL</span>
+                                <span className="text-3xl font-black text-slate-900 dark:text-slate-100 italic">
+                                    {getEnergyValue(stats.calories).toLocaleString()}
+                                </span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                                    {settings.energyUnit}
+                                </span>
                             </div>
                         </div>
 
@@ -195,12 +207,22 @@ export default function NutritionPanel({ isProcessing, selectedDate, viewMode }:
                         </div>
 
                         <div className="space-y-1">
-                            <StatsItem emoji="🔥" label="Calories" value={stats.calories.toLocaleString()} unit="kcal" />
-                            <StatsItem emoji="🍞" label="Carbs" value={stats.carbs} unit="g" />
+                            <StatsItem 
+                                emoji="🔥" 
+                                label="Total Energy" 
+                                value={getEnergyValue(stats.calories).toLocaleString()} 
+                                unit={settings.energyUnit} 
+                            />
+                            <StatsItem 
+                                emoji="🍞" 
+                                label={settings.carbsType === "net" ? "Net Carbs" : "Total Carbs"} 
+                                value={getCarbsValue(stats.carbs, stats.fiber)} 
+                                unit="g" 
+                            />
                             <StatsItem emoji="🥑" label="Fat" value={stats.fat} unit="g" />
                             <StatsItem emoji="🍗" label="Protein" value={stats.protein} unit="g" />
                             <hr className="my-2 border-slate-100 dark:border-slate-800" />
-                            <StatsItem emoji="🌾" label="Fiber" value={stats.fiber} unit="g" />
+                            <StatsItem emoji="🌾" label="Fiber Content" value={stats.fiber} unit="g" />
                         </div>
                     </motion.div>
                 ) : (

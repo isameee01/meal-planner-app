@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Meal, MealSchedule, MealSize, DayOfWeek } from "../../types/meals";
 import { useNutritionTargets } from "./useNutritionTargets";
+import { useGeneratorSettings } from "./useGeneratorSettings";
 
 const STORAGE_KEY = "meal_schedule_v2"; // Versioned to avoid conflicts with previous schema
 
@@ -39,6 +40,7 @@ export function useMealSchedule() {
         meals: []
     });
     const [isLoaded, setIsLoaded] = useState(false);
+    const { settings } = useGeneratorSettings();
 
     // Initial Load
     useEffect(() => {
@@ -78,6 +80,16 @@ export function useMealSchedule() {
             setIsLoaded(true);
         }
     }, []);
+
+    // Safeguard 7: Localization Sync
+    useEffect(() => {
+        const globalFirstDay = settings.firstDayOfWeek;
+        const mapped = (globalFirstDay.charAt(0).toUpperCase() + globalFirstDay.slice(1)) as DayOfWeek;
+        
+        if (isLoaded && schedule.firstDayOfWeek !== mapped) {
+            saveSchedule({ ...schedule, firstDayOfWeek: mapped });
+        }
+    }, [settings.firstDayOfWeek, schedule.firstDayOfWeek, isLoaded, schedule, saveSchedule]);
 
     // Save on changes
     const saveSchedule = useCallback((newSchedule: MealSchedule) => {

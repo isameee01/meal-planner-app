@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { generateMealPlan, GeneratedMeal, UserPreferences } from "../../lib/meal-planner";
 import { FOOD_DATABASE } from "../../lib/food-db";
+import { useGeneratorSettings } from "../../lib/hooks/useGeneratorSettings";
 import DropdownMenu from "./DropdownMenu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -109,6 +110,7 @@ export default function MealSection({
 }: MealSectionProps) {
     const [mealsMap, setMealsMap] = useState<Record<string, GeneratedMeal[]>>({});
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const { settings } = useGeneratorSettings();
 
     const getDateKey = (date: Date) => date.toISOString().split('T')[0];
 
@@ -139,7 +141,8 @@ export default function MealSection({
             excludedFoodIds: [],
             customFoods: Object.values(prefs).flatMap((p: any) => p.customFoods || []),
             mealSlots: slots.map((m: any) => m.name),
-            intelligentGeneration: anyGenOn
+            intelligentGeneration: anyGenOn,
+            settings: settings // Inject active settings
         };
 
         const targetDates: string[] = [];
@@ -180,6 +183,25 @@ export default function MealSection({
     useEffect(() => {
         loadMeals();
     }, [loadMeals]);
+
+    // Safeguard 6: Cache Invalidation (Immediate Regeneration)
+    useEffect(() => {
+        const lastSettings = localStorage.getItem("last_active_settings");
+        if (lastSettings) {
+            const parsed = JSON.parse(lastSettings);
+            const critChanged = 
+                parsed.priceLimit !== settings.priceLimit ||
+                parsed.focus !== settings.focus ||
+                parsed.carbsType !== settings.carbsType;
+
+            if (critChanged) {
+                console.log("[MealSection] Critical setting changed. Clearing cache & regenerating.");
+                localStorage.removeItem("meals_cache");
+                loadMeals();
+            }
+        }
+        localStorage.setItem("last_active_settings", JSON.stringify(settings));
+    }, [settings.priceLimit, settings.focus, settings.carbsType, loadMeals]);
 
     const handleRegenerate = () => {
         if (window.confirm("Regenerate all meals for this period?")) {
