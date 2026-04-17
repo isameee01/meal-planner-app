@@ -17,6 +17,7 @@ import FilterDrawer from "../../../components/discover/FilterDrawer";
 import FoodGrid from "../../../components/discover/FoodGrid";
 import NutritionDetailsModal from "../../../components/discover/NutritionDetailsModal";
 import AddToPlannerModal from "../../../components/discover/AddToPlannerModal";
+import AIRecommendations from "../../../components/discover/AIRecommendations";
 import { FoodItem } from "../../../lib/discover-db";
 import ErrorBoundary from "../../../components/common/ErrorBoundary";
 
@@ -107,6 +108,14 @@ export default function DiscoverPage() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* AI Recommendations */}
+                        <ErrorBoundary>
+                            <AIRecommendations 
+                                onAddToPlanner={setSelectedFoodForPlanner}
+                                onOpenNutrition={setSelectedFoodForNutrition}
+                            />
+                        </ErrorBoundary>
 
                         {/* Control Bar */}
                         <TopControlBar 

@@ -23,16 +23,25 @@ import {
     Clock,
     Scale,
     Activity,
-    AlertCircle
+    AlertCircle,
+    ShoppingCart,
+    Package,
+    ChevronRight,
+    Calendar
 } from "lucide-react";
 import { FULL_DISCOVER_DATABASE, FoodItem } from "../../../../lib/discover-db";
 import NutritionDetailsModal from "../../../../components/discover/NutritionDetailsModal";
 import AddToPlannerModal from "../../../../components/discover/AddToPlannerModal";
 import { useGlobalFoodState } from "../../../../lib/contexts/FoodStateContext";
+import { useMealState } from "../../../../lib/contexts/MealStateContext";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import Link from "next/link";
 
 export default function FoodDetailPage() {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+    
     const { id } = useParams();
     const router = useRouter();
     const { 
@@ -44,6 +53,7 @@ export default function FoodDetailPage() {
         blockFood, 
         unblockFood 
     } = useGlobalFoodState();
+    const { mealsMap } = useMealState();
     
     const [food, setFood] = useState<FoodItem | null>(null);
     const [servings, setServings] = useState(1);
@@ -53,12 +63,24 @@ export default function FoodDetailPage() {
     const [toasts, setToasts] = useState<{ id: string, message: string, type: "success" | "error" }[]>([]);
 
     useEffect(() => {
-        const found = FULL_DISCOVER_DATABASE.find((f: FoodItem) => f.id === id);
+        // 1. Try static database
+        let found = FULL_DISCOVER_DATABASE.find((f: FoodItem) => f.id === id);
+        
+        // 2. Try active meal context (for AI generated meals)
+        if (!found) {
+            Object.values(mealsMap).forEach(dayMeals => {
+                dayMeals.forEach(meal => {
+                    const item = meal.items.find(i => i.food.id === id);
+                    if (item) found = item.food as any;
+                });
+            });
+        }
+
         if (found) {
             setFood(found);
-            setServings(found.servings || 1);
+            setServings(Number(found?.servings || 1));
         }
-    }, [id]);
+    }, [id, mealsMap]);
 
     const isSaved = useMemo(() => savedFoods.includes(id as string), [savedFoods, id]);
     const isFavorite = useMemo(() => favoriteFoods.includes(id as string), [favoriteFoods, id]);
@@ -70,16 +92,28 @@ export default function FoodDetailPage() {
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== tid)), 3000);
     };
 
-    if (!food) return (
+    const scaleValue = (val: number | undefined) => Math.round((val || 0) * servings);
+
+    // Calculate Usage
+    const usage = useMemo(() => {
+        if (!food) return [];
+        const occurrences: { date: string, slot: string }[] = [];
+        Object.entries(mealsMap).forEach(([date, meals]) => {
+            meals.forEach(meal => {
+                if (meal.items.some(item => item.food.id === food.id)) {
+                    occurrences.push({ date, slot: meal.slot });
+                }
+            });
+        });
+        return occurrences;
+    }, [mealsMap, food]);
+
+    if (!mounted || !food) return (
         <div className="flex items-center justify-center min-h-[50vh]">
             <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
-    const scaleValue = (val: number) => {
-        const baseServings = food.servings || 1;
-        return ((val * servings) / baseServings).toFixed(1);
-    };
 
     const handlePrint = () => {
         window.print();
@@ -276,7 +310,7 @@ export default function FoodDetailPage() {
                     className="flex items-center gap-2 text-slate-500 hover:text-emerald-500 transition-colors font-bold uppercase text-xs tracking-widest"
                 >
                     <ChevronLeft size={20} />
-                    Back to Discover
+                    Back to Previous
                 </button>
                 <div className="flex gap-4">
                     <button 
@@ -371,16 +405,16 @@ export default function FoodDetailPage() {
                     {/* CENTER: Info & Ingredients */}
                     <div className="lg:col-span-8 space-y-12">
                         <div className="space-y-4">
-                            <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">{food.name}</h1>
-                            <p className="text-lg text-slate-500 dark:text-slate-400 font-medium leading-relaxed italic pr-6 max-w-2xl">{food.description}</p>
+                            <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">{food?.name || "Discovery Item"}</h1>
+                            <p className="text-lg text-slate-500 dark:text-slate-400 font-medium leading-relaxed italic pr-6 max-w-2xl">{food?.description || "High-quality nutritional component prepared for your custom plan."}</p>
                         </div>
 
                         {/* Stats Row */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 py-8 border-y border-slate-100 dark:border-slate-800">
                             {[
-                                { icon: Timer, label: "Cook Time", value: `${(food.prepTime || 0) + (food.cookTime || 0)} min` },
-                                { icon: Users, label: "Servings", value: food.servings || 1 },
-                                { icon: Flame, label: "Calories", value: `${food.nutrition.calories} kcal` }
+                                { icon: Timer, label: "Cook Time", value: `${(food?.prepTime || 0) + (food?.cookTime || 0)} min` },
+                                { icon: Users, label: "Servings", value: food?.servings || 1 },
+                                { icon: Flame, label: "Calories", value: `${food?.nutrition?.calories ?? food?.calories ?? 0} kcal` }
                             ].map(stat => (
                                 <div key={stat.label} className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
                                     <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-emerald-500 shadow-sm">
@@ -422,25 +456,47 @@ export default function FoodDetailPage() {
                                     </div>
                                 </div>
                                 
-                                <ul className="space-y-2">
-                                    {food.ingredients.map((ing: { name: string; amount: string }, i: number) => (
-                                        <motion.li 
-                                            key={i}
-                                            initial={{ opacity: 0, x: -10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: i * 0.05 }}
-                                            className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all border border-transparent hover:border-emerald-100 dark:hover:border-emerald-900/40"
-                                        >
-                                            <span className="font-bold text-slate-700 dark:text-slate-300">{ing.name}</span>
-                                            <span className="text-emerald-600 dark:text-emerald-400 font-black italic">
-                                                {ing.amount.match(/\d+/) 
-                                                    ? ing.amount.replace(/\d+/, (m: string) => scaleValue(parseInt(m)))
-                                                    : ing.amount
-                                                }
-                                            </span>
-                                        </motion.li>
-                                    ))}
-                                </ul>
+                                <div className="space-y-4">
+                                    <ul className="space-y-2">
+                                        {(food?.ingredients || []).map((ing: { name: string; amount: string }, i: number) => (
+                                            <motion.li 
+                                                key={i}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                className="group/ing"
+                                            >
+                                                <Link 
+                                                    href={`/dashboard/ingredients/${encodeURIComponent(ing?.name || "Unknown")}`}
+                                                    className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all border border-transparent hover:border-emerald-100 dark:hover:border-emerald-900/40 w-full"
+                                                >
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className="font-bold text-slate-700 dark:text-slate-300 group-hover/ing:text-emerald-500 transition-colors uppercase text-[11px] tracking-tight">{ing?.name || "Unknown"}</span>
+                                                        <ChevronRight size={12} className="text-slate-300 opacity-0 group-hover/ing:opacity-100 transition-all" />
+                                                    </div>
+                                                    <span className="text-emerald-600 dark:text-emerald-400 font-black italic text-xs">
+                                                        {ing?.amount}
+                                                    </span>
+                                                </Link>
+                                            </motion.li>
+                                        ))}
+                                    </ul>
+
+                                    {/* BUY ONLINE MOCK BUTTONS */}
+                                    <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Provisions & Sourcing</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-[#FF9900] text-white rounded-xl font-bold text-[10px] uppercase tracking-wider hover:brightness-110 transition-all shadow-lg shadow-orange-500/10">
+                                                <ShoppingCart size={14} />
+                                                Buy on Amazon
+                                            </button>
+                                            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-[#0071CE] text-white rounded-xl font-bold text-[10px] uppercase tracking-wider hover:brightness-110 transition-all shadow-lg shadow-blue-500/10">
+                                                <Package size={14} />
+                                                Walmart+
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="space-y-6">
@@ -457,12 +513,12 @@ export default function FoodDetailPage() {
                                     <div className="relative flex justify-center mb-4">
                                         <div className="w-40 h-40">
                                             <svg viewBox="0 0 36 36" className="w-full h-full">
-                                                <path className="text-emerald-500" stroke="currentColor" strokeWidth="4" strokeDasharray={`${Math.round((food.nutrition.carbs * 4 / food.nutrition.calories) * 100)}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                <path className="text-blue-500" stroke="currentColor" strokeWidth="4" strokeDashoffset={-Math.round((food.nutrition.carbs * 4 / food.nutrition.calories) * 100)} strokeDasharray={`${Math.round((food.nutrition.protein * 4 / food.nutrition.calories) * 100)}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                <path className="text-amber-500" stroke="currentColor" strokeWidth="4" strokeDashoffset={-Math.round(((food.nutrition.carbs * 4 + food.nutrition.protein * 4) / food.nutrition.calories) * 100)} strokeDasharray={`${Math.round((food.nutrition.fat * 9 / food.nutrition.calories) * 100)}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <path className="text-emerald-500" stroke="currentColor" strokeWidth="4" strokeDasharray={`${Math.round(((food?.nutrition?.carbs ?? food?.carbs ?? 1) * 4 / (food?.nutrition?.calories ?? food?.calories ?? 1)) * 100)}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <path className="text-blue-500" stroke="currentColor" strokeWidth="4" strokeDashoffset={-Math.round(((food?.nutrition?.carbs ?? food?.carbs ?? 0) * 4 / (food?.nutrition?.calories ?? food?.calories ?? 1)) * 100)} strokeDasharray={`${Math.round(((food?.nutrition?.protein ?? food?.protein ?? 0) * 4 / (food?.nutrition?.calories ?? food?.calories ?? 1)) * 100)}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                <path className="text-amber-500" stroke="currentColor" strokeWidth="4" strokeDashoffset={-Math.round((((food?.nutrition?.carbs ?? food?.carbs ?? 0) * 4 + (food?.nutrition?.protein ?? food?.protein ?? 0) * 4) / (food?.nutrition?.calories ?? food?.calories ?? 1)) * 100)} strokeDasharray={`${Math.round(((food?.nutrition?.fat ?? food?.fat ?? 0) * 9 / (food?.nutrition?.calories ?? food?.calories ?? 1)) * 100)}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                                             </svg>
                                             <div className="absolute inset-0 flex flex-col items-center justify-center font-black">
-                                                <span className="text-3xl text-emerald-400 leading-none">{scaleValue(food.nutrition.calories)}</span>
+                                                <span className="text-3xl text-emerald-400 leading-none">{scaleValue(food?.nutrition?.calories ?? food?.calories ?? 0)}</span>
                                                 <span className="text-[10px] text-slate-500 uppercase tracking-widest">Kcal</span>
                                             </div>
                                         </div>
@@ -470,9 +526,9 @@ export default function FoodDetailPage() {
 
                                     <div className="space-y-4">
                                         {[
-                                            { label: "Protein", color: "bg-blue-500", value: `${scaleValue(food.nutrition.protein)}g` },
-                                            { label: "Carbs", color: "bg-emerald-500", value: `${scaleValue(food.nutrition.carbs)}g` },
-                                            { label: "Fat", color: "bg-amber-500", value: `${scaleValue(food.nutrition.fat)}g` }
+                                            { label: "Protein", color: "bg-blue-500", value: `${scaleValue(food?.nutrition?.protein ?? food?.protein ?? 0)}g` },
+                                            { label: "Carbs", color: "bg-emerald-500", value: `${scaleValue(food?.nutrition?.carbs ?? food?.carbs ?? 0)}g` },
+                                            { label: "Fat", color: "bg-amber-500", value: `${scaleValue(food?.nutrition?.fat ?? food?.fat ?? 0)}g` }
                                         ].map(macro => (
                                             <div key={macro.label} className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
@@ -512,6 +568,29 @@ export default function FoodDetailPage() {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Usage Section */}
+                        <div className="pt-12 border-t border-slate-100 dark:border-slate-800">
+                             <div className="flex items-center gap-3 mb-8">
+                                <Calendar size={24} className="text-emerald-500" />
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">Usage Tracking</h3>
+                            </div>
+                            
+                            {usage.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {usage.map((u, i) => (
+                                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{u.slot}</p>
+                                            <p className="text-sm font-black text-slate-800 dark:text-slate-100 mt-1 uppercase tracking-tight">{u.date}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Not currently scheduled in your plan</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </motion.div>
             </div>
@@ -524,7 +603,7 @@ export default function FoodDetailPage() {
                         <p className="text-sm italic text-gray-600 m-0">{food.category} • {food.servings} Servings</p>
                      </div>
                      <div className="text-right">
-                        <div className="text-2xl font-black">{food.nutrition.calories} KCAL</div>
+                        <div className="text-2xl font-black">{food?.nutrition?.calories || food?.calories || 0} KCAL</div>
                         <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Per Serving</div>
                      </div>
                 </div>
@@ -533,7 +612,7 @@ export default function FoodDetailPage() {
                     <div>
                         <h2 className="text-xl font-bold uppercase border-b border-gray-300 pb-2 mb-4">Ingredients</h2>
                         <ul className="space-y-2">
-                            {food.ingredients.map((ing, i) => (
+                            {(food?.ingredients || []).map((ing, i) => (
                                 <li key={i} className="flex justify-between text-sm border-b border-gray-100 py-1">
                                     <span className="font-bold">{ing.name}</span>
                                     <span className="font-mono">{ing.amount}</span>
@@ -545,16 +624,15 @@ export default function FoodDetailPage() {
                         <h2 className="text-xl font-bold uppercase border-b border-gray-300 pb-2 mb-4">Nutrition per Serving</h2>
                         <div className="grid grid-cols-2 gap-4">
                             {[
-                                { label: "Protein", val: `${food.nutrition.protein}g` },
-                                { label: "Carbs", val: `${food.nutrition.carbs}g` },
-                                { label: "Fat", val: `${food.nutrition.fat}g` },
-                                { label: "Fiber", val: `${food.nutrition.fiber}g` },
-                                { label: "Sodium", val: `${food.nutrition.sodium}mg` },
-                                { label: "Sugar", val: `${food.nutrition.sugar.total}g` }
+                                <NutrientRow key="protein" label="Protein" value={(food?.nutrition?.protein ?? food?.protein ?? 0) * (servings || 1)} unit="g" />,
+                                <NutrientRow key="carbs" label="Carbohydrates" value={(food?.nutrition?.carbs ?? food?.carbs ?? 0) * (servings || 1)} unit="g" />,
+                                <NutrientRow key="fiber" label="Dietary Fiber" value={(food?.nutrition?.fiber ?? food?.fiber ?? 0) * (servings || 1)} unit="g" />,
+                                <NutrientRow key="fat" label="Total Fats" value={(food?.nutrition?.fat ?? food?.fat ?? 0) * (servings || 1)} unit="g" />,
+                                <NutrientRow key="sodium" label="Sodium" value={(food?.nutrition?.sodium ?? food?.sodium ?? 0) * (servings || 1)} unit="mg" />,
+                                <NutrientRow key="sugar" label="Sugar" value={(food?.nutrition?.sugar?.total ?? food?.sugar ?? 0) * (servings || 1)} unit="g" />
                             ].map(item => (
-                                <div key={item.label} className="flex justify-between items-center text-sm border-b border-gray-100 py-1">
-                                    <span className="text-gray-500 uppercase text-[10px] font-bold">{item.label}</span>
-                                    <span className="font-black">{item.val}</span>
+                                <div key={item.key} className="flex justify-between items-center text-sm border-b border-gray-100 py-1">
+                                    {item}
                                 </div>
                             ))}
                         </div>
@@ -564,7 +642,7 @@ export default function FoodDetailPage() {
                 <div className="mt-10">
                     <h2 className="text-xl font-bold uppercase border-b border-gray-300 pb-2 mb-4">Preparation Directions</h2>
                     <div className="space-y-6">
-                        {food.directions.map((step, i) => (
+                        {(food?.directions || []).map((step: string, i: number) => (
                             <div key={i} className="flex gap-4">
                                 <span className="font-black text-2xl text-gray-200">{i + 1}</span>
                                 <p className="text-sm leading-relaxed">{step}</p>
@@ -593,3 +671,11 @@ export default function FoodDetailPage() {
         </div>
     );
 }
+
+const NutrientRow = ({ label, value, unit }: { label: string, value: number, unit: string }) => (
+    <div className="flex justify-between items-center w-full px-1">
+        <span className="text-gray-500 uppercase text-[10px] font-bold tracking-widest">{label}</span>
+        <span className="font-black text-sm text-slate-800 dark:text-slate-100">{Math.round(value)}{unit}</span>
+    </div>
+);
+

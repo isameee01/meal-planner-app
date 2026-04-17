@@ -18,6 +18,13 @@ export interface FoodItem {
     serving: string;
     tags: string[];
     mealTypes: MealType[]; // Which meal slots this food is appropriate for
+    // Optional fields for AI-generated / detailed recipes
+    description?: string;
+    ingredients?: { name: string; amount: string; calories?: number }[];
+    directions?: string[];
+    prepTime?: number;
+    cookTime?: number;
+    image?: string;
 }
 
 export const FOOD_DATABASE: FoodItem[] = [

@@ -115,10 +115,7 @@ export default function DashboardPage() {
         end: selectedDate.week?.end || null
     };
 
-    if (!mounted) {
-        // We still need to handle the case where we redirect before mount if possible, 
-        // but usually we wait for mount to check localStorage accurately.
-    }
+    if (!mounted) return null;
 
 
     return (

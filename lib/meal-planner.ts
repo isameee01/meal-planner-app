@@ -15,13 +15,21 @@ export interface UserPreferences {
 export interface GeneratedMeal {
     slot: string;
     items: {
-        food: FoodItem;
+        food: FoodItem; // This will now carry recipe details if AI generated
         amount: number; // multiplier for the base serving
     }[];
     totalCalories: number;
     totalProtein: number;
     totalCarbs: number;
     totalFat: number;
+    // Recipe fields for the whole meal (optional for AI generation)
+    recipe?: {
+        directions: string[];
+        prepTime?: number;
+        cookTime?: number;
+        description: string;
+        image?: string;
+    };
 }
 
 /**
@@ -105,18 +113,17 @@ function scoreFood(
 }
 
 /**
- * Meal Planner Engine (Production Version)
+ * Meal Planner Engine (Strategic Production Version)
  */
 export function generateMealPlan(
     profile: NutritionProfile,
     preferences: UserPreferences
 ): GeneratedMeal[] {
     const { mealSlots, intelligentGeneration, settings } = preferences;
-    const { calories } = profile;
+    const { calories, macros } = profile;
 
-    console.log("[Generator] Starting with settings:", settings);
+    console.log("[Generator] Synthesis starting. Target:", calories, "kcal");
 
-    // Handle Generation OFF
     if (!intelligentGeneration) {
         return mealSlots.map(slot => ({
             slot,
@@ -143,12 +150,12 @@ export function generateMealPlan(
         const split = slotSplits[slot] || (1 / mealSlots.length);
         const targetCals = calories * split;
 
-        // Filter by Meal Type (normalized)
+        // 1. Candidate Selection with Strict Meal Type Alignment
         const normalizedSlot = slot.toLowerCase() as MealType;
         const candidates = fullDb.filter(f => f.mealTypes.includes(normalizedSlot));
 
-        // Score and Shuffle
-        const scored = shuffle(candidates)
+        // 2. Intelligent Scoring
+        let scored = shuffle(candidates)
             .map(f => ({ 
                 food: f, 
                 score: scoreFood(f, preferences, dayUsedIds, plan.flatMap(m => m.items.map(i => i.food.id))) 
@@ -156,46 +163,56 @@ export function generateMealPlan(
             .filter(f => f.score > -500) 
             .sort((a, b) => b.score - a.score);
 
-        // Selection Fallback
-        if (scored.length < 3) return;
+        // 3. SAFE FALLBACK: If candidate pool is too small due to restrictions, inject a reliable staple
+        if (scored.length < 3) {
+            console.warn(`[Generator] Low candidates for ${slot}. Using staple fallback.`);
+            const fallback = getFallbackStaple(normalizedSlot);
+            scored = [{ food: fallback, score: 1000 }];
+        }
 
-        // Composition
+        // 4. Meal Composition Logic (Protein + Carb + Fat/Veggie)
+        // For Breakfast, we also look for Smoothies/Snacks
         const proteins = scored.filter(f => f.food.category === "protein" || f.food.category === "smoothie");
         const carbs = scored.filter(f => f.food.category === "carb");
         const fats = scored.filter(f => f.food.category === "fat" || f.food.category === "snack" || f.food.category === "veggie");
 
-        if (proteins.length === 0 || carbs.length === 0 || fats.length === 0) return;
+        // Strategy: Pick the best available trio, or fallback to the single best item if it's a 'complete' meal (smoothie/snack)
+        let selected: FoodItem[] = [];
+        if (proteins.length > 0 && carbs.length > 0 && fats.length > 0) {
+            selected = [proteins[0].food, carbs[0].food, fats[0].food];
+        } else if (scored.length > 0) {
+            selected = [scored[0].food];
+        } else {
+            selected = [getFallbackStaple(normalizedSlot)];
+        }
 
-        const protein = proteins[0].food;
-        const carb = carbs[0].food;
-        const fat = fats[0].food;
+        // 5. Macro-Aware Portion Scaling
+        // Logic: Prioritize protein hit first, then fill remainder with carbs/fats
+        dayUsedIds.push(...selected.map(f => f.id));
 
-        // Tracking
-        dayUsedIds.push(protein.id, carb.id, fat.id);
-
-        // Portion Logic (Safeguard 4: Half Servings Control)
         const roundPortion = (val: number) => {
             let rounded = settings.allowHalfServings 
                 ? Math.round(val * 2) / 2 
                 : Math.round(val);
-            return Math.max(1, rounded); // Never produce 0
+            return Math.max(0.5, rounded); // Minimum half serving
         };
 
-        const pScale = roundPortion((targetCals * 0.45) / protein.calories);
-        const cScale = roundPortion((targetCals * 0.35) / carb.calories);
-        const fScale = roundPortion((targetCals * 0.20) / fat.calories);
+        const totalSelectedCals = selected.reduce((sum, f) => sum + f.calories, 0);
+        const baseMultiplier = targetCals / (totalSelectedCals || 1);
 
-        const items = [
-            { food: protein, amount: pScale },
-            { food: carb, amount: cScale },
-            { food: fat, amount: fScale }
-        ];
+        const items = selected.map(f => {
+            let multiplier = baseMultiplier;
+            // Adjustment: If it's a protein-only food, we can be more aggressive to hit macro targets
+            if (f.category === "protein" && f.protein > 15) {
+                multiplier *= 1.1; // Slight nudge for muscle gain focus/macros
+            }
+            return { food: f, amount: roundPortion(multiplier) };
+        });
 
+        // 6. Plan Aggregation
         const mealCals = items.reduce((acc, i) => acc + i.food.calories * i.amount, 0);
         const mealProtein = items.reduce((acc, i) => acc + i.food.protein * i.amount, 0);
         const mealFat = items.reduce((acc, i) => acc + i.food.fat * i.amount, 0);
-        
-        // Net Carbs Logic (Safeguard 5)
         const mealTotalCarbs = items.reduce((acc, i) => acc + i.food.carbs * i.amount, 0);
         const mealFiber = items.reduce((acc, i) => acc + (i.food.fiber || 0) * i.amount, 0);
         
@@ -213,6 +230,19 @@ export function generateMealPlan(
         });
     });
 
-    console.log("[Generator] Generated Plan:", plan);
     return plan;
+}
+
+/**
+ * RECOVERY SYSTEM: Returns a staple food item if generation pool is empty.
+ */
+function getFallbackStaple(slot: MealType): FoodItem {
+    const staples: Record<MealType, string> = {
+        "breakfast": "p6", // Egg
+        "lunch": "p1",     // Chicken
+        "dinner": "p3",    // Beef
+        "snack": "c7"      // Banana
+    };
+    const id = staples[slot] || "p1";
+    return FOOD_DATABASE.find(f => f.id === id) || FOOD_DATABASE[0];
 }

@@ -22,7 +22,19 @@ interface NutritionDetailsModalProps {
 export default function NutritionDetailsModal({ isOpen, onClose, food }: NutritionDetailsModalProps) {
     if (!food) return null;
 
-    const { nutrition } = food;
+    // Normalize nutrition data (handle both static and AI structures)
+    const calories = food.nutrition?.calories ?? food.calories ?? 0;
+    const protein = food.nutrition?.protein ?? food.protein ?? 0;
+    const carbs = food.nutrition?.carbs ?? food.carbs ?? 0;
+    const fat = food.nutrition?.fat ?? food.fat ?? 0;
+    const fiber = food.nutrition?.fiber ?? food.fiber ?? 0;
+    const sugarTotal = food.nutrition?.sugar?.total ?? food.sugar ?? 0;
+    const sugarAdded = food.nutrition?.sugar?.added ?? 0;
+    
+    const vitamins = food.nutrition?.vitamins ?? {};
+    const minerals = food.nutrition?.minerals ?? {};
+    const aminoAcids = food.nutrition?.aminoAcids ?? {};
+    const fatBreakdown = food.nutrition?.fatBreakdown ?? { saturated: 0, polyunsaturated: 0, monounsaturated: 0, trans: 0 };
 
     const handleDownloadPDF = () => {
         const doc = new jsPDF();
@@ -40,12 +52,12 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
             startY: 40,
             head: [['Nutrient', 'Value', 'Daily Context']],
             body: [
-                ['Calories', `${nutrition.calories} kcal`, 'Energy Source'],
-                ['Protein', `${nutrition.protein}g`, 'Muscle Support'],
-                ['Carbohydrates', `${nutrition.carbs}g`, 'Energy'],
-                ['Total Fat', `${nutrition.fat}g`, 'Essential Fatty Acids'],
-                ['Fiber', `${nutrition.fiber}g`, 'Digestion'],
-                ['Sugars', `${nutrition.sugar.total}g`, 'Natural & Added']
+                ['Calories', `${Math.round(calories)} kcal`, 'Energy Source'],
+                ['Protein', `${Math.round(protein)}g`, 'Muscle Support'],
+                ['Carbohydrates', `${Math.round(carbs)}g`, 'Energy'],
+                ['Total Fat', `${Math.round(fat)}g`, 'Essential Fatty Acids'],
+                ['Fiber', `${Math.round(fiber)}g`, 'Digestion'],
+                ['Sugars', `${Math.round(sugarTotal)}g`, 'Natural & Added']
             ],
             theme: 'striped',
             headStyles: { fillColor: [16, 185, 129] }
@@ -57,8 +69,8 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
         doc.setTextColor(0);
         doc.text("Vitamins & Minerals", 14, finalY + 15);
 
-        const vits = Object.entries(nutrition.vitamins).map(([k, v]) => [k.replace("vitamin", "Vit "), v]);
-        const mins = Object.entries(nutrition.minerals).map(([k, v]) => [k, v]);
+        const vits = Object.entries(vitamins).map(([k, v]) => [k.replace("vitamin", "Vit "), v]);
+        const mins = Object.entries(minerals).map(([k, v]) => [k, v]);
         
         autoTable(doc, {
             startY: finalY + 20,
@@ -76,7 +88,7 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
         doc.setFontSize(16);
         doc.text("Amino Acid Profile", 14, finalY2 + 15);
         
-        const aminos = Object.entries(nutrition.aminoAcids).map(([k, v]) => [k, v]);
+        const aminos = Object.entries(aminoAcids).map(([k, v]) => [k, v]);
         autoTable(doc, {
             startY: finalY2 + 20,
             head: [['Amino Acid', 'Concentration']],
@@ -99,10 +111,10 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
             color: "text-emerald-500",
             bg: "bg-emerald-50",
             items: [
-                { label: "Calories", value: `${nutrition.calories} kcal`, sub: "Daily Energy" },
-                { label: "Protein", value: `${nutrition.protein}g`, sub: "Muscle Repair" },
-                { label: "Carbs", value: `${nutrition.carbs}g`, sub: "Energy Source" },
-                { label: "Fat", value: `${nutrition.fat}g`, sub: "Hormone Health" }
+                { label: "Calories", value: `${Math.round(calories)} kcal`, sub: "Daily Energy" },
+                { label: "Protein", value: `${Math.round(protein)}g`, sub: "Muscle Repair" },
+                { label: "Carbs", value: `${Math.round(carbs)}g`, sub: "Energy Source" },
+                { label: "Fat", value: `${Math.round(fat)}g`, sub: "Hormone Health" }
             ]
         },
         {
@@ -111,19 +123,19 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
             color: "text-amber-500",
             bg: "bg-amber-50",
             items: [
-                { label: "Dietary Fiber", value: `${nutrition.fiber}g`, sub: "Digestive Health" },
-                { label: "Total Sugars", value: `${nutrition.sugar.total}g`, sub: "Natural/Added" },
-                { label: "Added Sugars", value: `${nutrition.sugar.added}g`, sub: "Limit Daily" },
-                { label: "Glucose", value: `${nutrition.sugar.glucose || 0}g`, sub: "Simple Sugar" }
+                { label: "Dietary Fiber", value: `${Math.round(fiber)}g`, sub: "Digestive Health" },
+                { label: "Total Sugars", value: `${Math.round(sugarTotal)}g`, sub: "Natural/Added" },
+                { label: "Added Sugars", value: `${Math.round(sugarAdded)}g`, sub: "Limit Daily" },
+                { label: "Glucose", value: "N/A", sub: "Simple Sugar" }
             ]
         }
     ];
 
     const detailedFats = [
-        { label: "Saturated Fat", value: `${nutrition.fatBreakdown.saturated}g` },
-        { label: "Polyunsaturated", value: `${nutrition.fatBreakdown.polyunsaturated}g` },
-        { label: "Monounsaturated", value: `${nutrition.fatBreakdown.monounsaturated}g` },
-        { label: "Trans Fat", value: `${nutrition.fatBreakdown.trans}g` }
+        { label: "Saturated Fat", value: `${fatBreakdown.saturated || 0}g` },
+        { label: "Polyunsaturated", value: `${fatBreakdown.polyunsaturated || 0}g` },
+        { label: "Monounsaturated", value: `${fatBreakdown.monounsaturated || 0}g` },
+        { label: "Trans Fat", value: `${fatBreakdown.trans || 0}g` }
     ];
 
     return (
@@ -207,12 +219,12 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Vitamins
                                     </h4>
                                     <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                                        {Object.entries(nutrition.vitamins).map(([key, value]) => (
+                                        {Object.entries(vitamins).length > 0 ? Object.entries(vitamins).map(([key, value]) => (
                                             <div key={key} className="flex justify-between items-center text-[13px]">
                                                 <span className="text-slate-500 font-medium capitalize">{key.replace("vitamin", "Vit ")}</span>
-                                                <span className="font-bold text-slate-800 dark:text-slate-200">{value}</span>
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">{value as string}</span>
                                             </div>
-                                        ))}
+                                        )) : <p className="text-[10px] text-slate-400 italic">Standard profile.</p>}
                                     </div>
                                 </div>
                                 <div className="space-y-4">
@@ -220,12 +232,12 @@ export default function NutritionDetailsModal({ isOpen, onClose, food }: Nutriti
                                         <div className="w-1.5 h-1.5 rounded-full bg-purple-500" /> Minerals
                                     </h4>
                                     <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                                        {Object.entries(nutrition.minerals).map(([key, value]) => (
+                                        {Object.entries(minerals).length > 0 ? Object.entries(minerals).map(([key, value]) => (
                                             <div key={key} className="flex justify-between items-center text-[13px]">
                                                 <span className="text-slate-500 font-medium capitalize">{key}</span>
-                                                <span className="font-bold text-slate-800 dark:text-slate-200">{value}</span>
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">{value as string}</span>
                                             </div>
-                                        ))}
+                                        )) : <p className="text-[10px] text-slate-400 italic">Standard profile.</p>}
                                     </div>
                                 </div>
                             </div>

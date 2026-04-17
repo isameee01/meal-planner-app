@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { UserPhysicalStats, ActivityLevelId, Sex, BodyFatLevel } from "../../types/user";
+import { repairSystemData } from "../utils/initializeSystem";
 
 const STORAGE_KEY = "user_stats";
 const MIGRATION_VERSION = 1;
@@ -32,67 +33,21 @@ export function useUserStats() {
     useEffect(() => {
         const loadStats = () => {
             try {
-                const stored = localStorage.getItem(STORAGE_KEY);
-                let currentStats: UserPhysicalStats | null = null;
-
-                if (stored) {
-                    currentStats = JSON.parse(stored);
+                // Use the centralized system repair utility
+                const { stats: repairedStats, needsSetup } = repairSystemData();
+                
+                if (needsSetup) {
+                    // We could potentially redirect here, but for now we just
+                    // log the need and let the components handle the state.
+                    console.log("[useUserStats] System needs setup.");
                 }
 
-                // Check for migration if version is missing or old
-                if (!currentStats || (currentStats.migrationVersion || 0) < MIGRATION_VERSION) {
-                    const onboardingAbout = localStorage.getItem("onboarding_about");
-                    const userProfile = localStorage.getItem("user_profile");
-                    const userAccount = localStorage.getItem("user");
-
-                    let migratedStats: Partial<UserPhysicalStats> = {};
-
-                    if (onboardingAbout) {
-                        try {
-                            const about = JSON.parse(onboardingAbout);
-                            // Onboarding about used KG
-                            migratedStats = {
-                                ...migratedStats,
-                                weight: about.weight || 70,
-                                height: { ft: about.ft || 5, in: about.in || 10 },
-                                age: about.age || 30,
-                                sex: (about.gender === "female" ? "female" : (about.gender === "male" ? "male" : "non-binary")) as Sex,
-                                activityLevel: (about.activityLevel || "moderately_active") as ActivityLevelId,
-                                weightUnit: "kg"
-                            };
-                        } catch (e) {}
-                    }
-
-                    if (userProfile) {
-                        try {
-                            const profile = JSON.parse(userProfile);
-                            migratedStats = {
-                                ...migratedStats,
-                                weight: profile.weight ? Number(profile.weight) : (migratedStats.weight || 70)
-                            };
-                        } catch (e) {}
-                    }
-
-                    if (userAccount) {
-                        try {
-                            const user = JSON.parse(userAccount);
-                            migratedStats.name = user.fullName || "";
-                        } catch (e) {}
-                    }
-
-                    const finalStats = {
-                        ...DEFAULT_STATS,
-                        ...migratedStats,
-                        migrationVersion: MIGRATION_VERSION
-                    };
-
-                    setStats(finalStats);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalStats));
-                } else {
-                    setStats(currentStats);
-                }
+                setStats(repairedStats);
+                
+                // If the stats were migrated/repaired, they were already stored
+                // by repairSystemData, so we just update the local state.
             } catch (e) {
-                console.error("Failed to load user stats", e);
+                console.error("Failed to initialize system stats", e);
                 setStats(DEFAULT_STATS);
             } finally {
                 setIsLoaded(true);

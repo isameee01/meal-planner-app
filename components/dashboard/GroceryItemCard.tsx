@@ -85,6 +85,8 @@ const CATEGORY_ICONS: Record<string, any> = {
     "Snacks": Cookie,
 };
 
+import Link from "next/link";
+
 const GroceryItemCard = React.memo(({ item, selected, onToggle, onUpdate }: GroceryItemCardProps) => {
     const [imgError, setImgError] = useState(false);
     const Icon = CATEGORY_ICONS[item.category] || Utensils;
@@ -97,75 +99,77 @@ const GroceryItemCard = React.memo(({ item, selected, onToggle, onUpdate }: Groc
     return (
         <motion.div 
             layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`group relative flex items-center p-4 bg-white dark:bg-slate-900 rounded-[24px] border transition-all duration-300 ${
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`group relative flex items-center p-3 bg-white dark:bg-slate-900 rounded-[32px] border transition-all duration-300 ${
                 selected 
-                    ? "border-emerald-500 ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/5 bg-emerald-50/5" 
-                    : "border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-xl hover:shadow-slate-500/5 hover:-translate-y-0.5"
+                    ? "border-emerald-500 ring-4 ring-emerald-500/5 bg-emerald-50/10" 
+                    : "border-slate-100 dark:border-slate-800 hover:border-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/5"
             }`}
         >
-            {/* Checkbox */}
+            {/* Multi-Select Action */}
             <button 
-                onClick={() => onToggle(item.id)}
-                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                onClick={(e) => { e.stopPropagation(); onToggle(item.id); }}
+                className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
                     selected 
                         ? "bg-emerald-500 border-emerald-500 text-white" 
-                        : "border-slate-200 dark:border-slate-700 hover:border-emerald-400"
+                        : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-500"
                 }`}
             >
-                {selected && <Check size={14} strokeWidth={3} />}
+                {selected && <Check size={14} strokeWidth={4} />}
             </button>
 
-            {/* Product Image */}
-            <div className="mx-4 w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-100 dark:border-slate-800">
-                {!imgError && imageUrl ? (
-                    <img 
-                        src={imageUrl} 
-                        alt={item.name}
-                        onError={() => setImgError(true)}
-                        className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500"
-                    />
-                ) : (
-                    <Icon size={20} className="text-slate-400" />
-                )}
-            </div>
-
-            {/* Item Details */}
-            <div className="flex-1 min-w-0 mr-4">
-                <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 truncate uppercase mt-0.5 leading-none">
-                    {item.name}
-                </h4>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 mr-1.5" />
-                    {item.category}
-                </p>
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center space-x-2">
-                <div className="relative">
-                    <input 
-                        type="number" 
-                        min="0"
-                        step="0.01"
-                        value={item.quantity}
-                        onChange={(e) => onUpdate(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                        className="w-16 px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500/20 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
+            {/* Main Clickable Area (Deep Navigation) */}
+            <Link 
+                href={`/dashboard/ingredients/${encodeURIComponent(item.name)}`}
+                className="flex items-center flex-1 min-w-0 mx-4 group/inner"
+            >
+                <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 flex flex-shrink-0 items-center justify-center overflow-hidden border border-slate-100 dark:border-slate-700 group-hover/inner:scale-110 transition-transform duration-500 shadow-sm">
+                    {!imgError && imageUrl ? (
+                        <img 
+                            src={imageUrl} 
+                            alt={item.name}
+                            onError={() => setImgError(true)}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <Icon size={24} className="text-emerald-500/40" />
+                    )}
                 </div>
-                
-                <div className="relative group/unit">
+
+                <div className="flex-1 min-w-0 ml-4 mr-2">
+                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 truncate uppercase mt-0.5 leading-tight group-hover/inner:text-emerald-500 transition-colors">
+                        {item.name}
+                    </h4>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1.5 flex items-center">
+                        <span className="w-1.5 h-px bg-emerald-500/50 mr-2" />
+                        {item.category}
+                    </p>
+                </div>
+            </Link>
+
+            {/* Real-time Inventory Controls */}
+            <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/80 rounded-[20px] p-2 border border-slate-100 dark:border-slate-700 min-w-[70px]">
+                <input 
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={item.quantity}
+                    onChange={(e) => onUpdate(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-transparent border-none text-center text-xs font-black text-slate-900 dark:text-white focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <div className="relative mt-1 group/unit w-full flex justify-center border-t border-slate-200 dark:border-slate-700 pt-1.5">
                     <select 
                         value={item.unit}
-                        onChange={(e) => onUpdate(item.id, { unit: e.target.value })}
-                        className="appearance-none bg-slate-50 dark:bg-slate-800 px-3 pr-8 py-1.5 rounded-xl text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onChange={(e) => { e.stopPropagation(); onUpdate(item.id, { unit: e.target.value }); }}
+                        className="appearance-none bg-transparent w-full text-center pr-3 py-0.5 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 border-none focus:ring-0 cursor-pointer"
                     >
                         {units.map(u => (
-                            <option key={u} value={u}>{u}</option>
+                            <option key={u} value={u} className="bg-white dark:bg-slate-900">{u}</option>
                         ))}
                     </select>
-                    <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform group-hover/unit:-translate-y-0.5" />
+                    <ChevronDown size={8} className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
                 </div>
             </div>
         </motion.div>
