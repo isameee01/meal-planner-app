@@ -20,9 +20,22 @@ export interface FoodItem {
     mealTypes: MealType[]; // Which meal slots this food is appropriate for
     // Optional fields for AI-generated / detailed recipes
     description?: string;
-    ingredients?: { name: string; amount: string; calories?: number }[];
-    directions?: string[];
-    prepTime?: number;
+    recipe?: {
+        ingredients: { 
+            name: string; 
+            amount: string; 
+            calories?: number; 
+            protein?: number; 
+            carbs?: number; 
+            fats?: number 
+        }[];
+        instructions: string[];
+        prepTime: number;
+    };
+    isGeneratingRecipe?: boolean;
+    ingredients?: any[]; // Legacy fallback 
+    directions?: string[]; // Legacy fallback
+    prepTime?: number;    // Legacy fallback
     cookTime?: number;
     image?: string;
     nutrition?: any; // For compatibility with discover-db

@@ -152,8 +152,8 @@ export default function CalendarModal({ isOpen, onClose, onSelectDate, currentDa
                         </div>
 
                         <div className="grid grid-cols-7 gap-1">
-                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
-                                <div key={d} className="text-center text-[10px] font-black text-slate-300 dark:text-slate-600 mb-2 uppercase tracking-widest">{d}</div>
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                                <div key={`weekday-${i}`} className="text-center text-[10px] font-black text-slate-300 dark:text-slate-600 mb-2 uppercase tracking-widest">{d}</div>
                             ))}
                             
                             {calendarDays.map((day, idx) => {

@@ -13,7 +13,8 @@ import {
     ArrowRight,
     Sparkles,
     Scale,
-    UtensilsCrossed
+    UtensilsCrossed,
+    Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { AddItemModal } from "./AddItemModal";
@@ -33,7 +34,8 @@ export const MealCard = ({ meal, dateKey }: MealCardProps) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const [replacingFood, setReplacingFood] = useState<FoodItem | null>(null);
     const [isAddingItem, setIsAddingItem] = useState(false);
-    const { updateItemServing, replaceFood, rebalanceDay, regenerateDay, removeItem, mealsMap } = useMealState();
+    const [isRebalancing, setIsRebalancing] = useState(false);
+    const { updateItemServing, replaceFood, rebalanceDay, addItemToMeal, regenerateDay, removeItem, mealsMap } = useMealState();
     const { activeTarget } = useNutritionTargets();
     const { stats: userData } = useUserStats();
     const router = useRouter();
@@ -46,33 +48,19 @@ export const MealCard = ({ meal, dateKey }: MealCardProps) => {
     };
 
     const handleAddItem = async (food: any, rebalance: boolean) => {
+        setIsAddingItem(false); // close modal immediately
         if (rebalance) {
-            // Rebalance Day calls AI to adjust future meals
-            await rebalanceDay(dateKey, food, meal.slot, userData, activeTarget?.calories || 2000);
+            // rebalanceDay adds the food AND calls AI to rebalance future slots
+            setIsRebalancing(true);
+            try {
+                await rebalanceDay(dateKey, food, meal.slot, userData, activeTarget?.calories ?? 2000);
+            } finally {
+                setIsRebalancing(false);
+            }
         } else {
-            // Just add directly to this meal slot
-            // Since replaceFood adds or replaces, we can use a similar pattern or add a new method.
-            // For now, let's just use replaceFood but with a special 'new' id if adding.
-            // Or better, let's just use regeneration for simplicity if we can't easily append.
-            // Actually, replaceFood is for 1-1 replacement. 
-            // I'll call regenerateDay with the updated meal.
-            const updatedMeals = (mealsMap[dateKey] || []).map(m => {
-                if (m.slot === meal.slot) {
-                    const newItems = [...m.items, { food, amount: 1 }];
-                    return {
-                        ...m,
-                        items: newItems,
-                        totalCalories: newItems.reduce((sum, i) => sum + i.food.calories * i.amount, 0),
-                        totalProtein: newItems.reduce((sum, i) => sum + i.food.protein * i.amount, 0),
-                        totalCarbs: newItems.reduce((sum, i) => sum + i.food.carbs * i.amount, 0),
-                        totalFat: newItems.reduce((sum, i) => sum + i.food.fat * i.amount, 0)
-                    };
-                }
-                return m;
-            });
-            regenerateDay(dateKey, updatedMeals);
+            // Simple append — immutable, instant UI update
+            addItemToMeal(dateKey, meal.slot, food);
         }
-        setIsAddingItem(false);
     };
 
     const handleRowClick = (foodId: string) => {
@@ -88,8 +76,22 @@ export const MealCard = ({ meal, dateKey }: MealCardProps) => {
             layout
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 mb-6 group/card"
+            className={`bg-white dark:bg-slate-900 rounded-[32px] border overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 mb-6 group/card ${
+                isRebalancing
+                    ? "border-emerald-300 dark:border-emerald-700 shadow-emerald-100 dark:shadow-emerald-900/20"
+                    : "border-slate-200 dark:border-slate-800"
+            }`}
         >
+            {/* Rebalancing Banner */}
+            {isRebalancing && (
+                <div className="flex items-center gap-3 px-6 py-3 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-800/40">
+                    <Loader2 size={14} className="text-emerald-500 animate-spin shrink-0" />
+                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                        AI rebalancing remaining meals…
+                    </span>
+                </div>
+            )}
+
             {/* Meal Header */}
             <div className="p-6 flex items-center justify-between bg-white dark:bg-slate-900">
                 <div className="flex items-center space-x-5">

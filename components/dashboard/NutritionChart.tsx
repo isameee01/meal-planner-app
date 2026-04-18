@@ -53,7 +53,7 @@ export default function NutritionChart({ selectedDate }: { selectedDate: Date | 
             </div>
 
             <div className="p-6">
-                <div className="h-56 w-full relative mb-8">
+                <div className="h-56 w-full relative mb-8" style={{ minHeight: 224, minWidth: 1 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie

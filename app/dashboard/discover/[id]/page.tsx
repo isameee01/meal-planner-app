@@ -180,7 +180,7 @@ export default function FoodDetailPage() {
             doc.setTextColor(51, 65, 85); // slate-700
             
             let ingY = currentY + 10;
-            food.ingredients.forEach((ing, i) => {
+            (food.ingredients ?? []).forEach((ing, i) => {
                 const text = `${ing.name}: ${ing.amount}`;
                 const lines = doc.splitTextToSize(text, colWidth);
                 doc.text(lines, margin, ingY);
@@ -551,13 +551,13 @@ export default function FoodDetailPage() {
                             </div>
                             
                             <div className="space-y-8">
-                                {food.directions.map((step, i) => (
+                                {(food.directions ?? []).map((step, i) => (
                                     <div key={i} className="flex gap-8 group">
                                         <div className="relative shrink-0">
                                             <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-xl font-black text-emerald-500 border border-slate-100 dark:border-slate-700 shadow-sm group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-300">
                                                 {i + 1}
                                             </div>
-                                            {i < food.directions.length - 1 && (
+                                            {i < (food.directions ?? []).length - 1 && (
                                                 <div className="absolute top-14 bottom-[-32px] left-1/2 w-0.5 bg-slate-100 dark:bg-slate-800 -translate-x-1/2" />
                                             )}
                                         </div>

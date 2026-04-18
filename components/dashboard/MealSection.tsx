@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateMealPlan, GeneratedMeal, UserPreferences } from "../../lib/meal-planner";
-import { generateMealPlanAI } from "../../lib/ai/generateMealPlan";
+import { generateMultiDayMealPlanAI } from "../../lib/ai/generateMealPlan";
 import { useNutritionTargets } from "../../lib/hooks/useNutritionTargets";
 import { useGlobalFoodState } from "../../lib/contexts/FoodStateContext";
 import { FOOD_DATABASE } from "../../lib/food-db";
@@ -110,15 +110,19 @@ export default function MealSection({
                 return;
             }
 
-            const dateStr = getDateKey(selectedDate);
-            
-            // 1. Check if we already have meals for this date
-            if (mealsMap[dateStr]) {
+            // Determine which dates still need meals generated
+            const missingDates = targetDates
+                .map(d => getDateKey(d))
+                .filter(dateStr => !mealsMap[dateStr]);
+
+            if (missingDates.length === 0) {
                 setIsProcessing(false);
                 return;
             }
 
-            // 2. TRIGGER AI GENERATION (AUTONOMOUS)
+            console.log("[MealSection] Generating meals for missing dates:", missingDates);
+
+            // TRIGGER AI GENERATION FOR ALL MISSING DATES IN ONE CALL
             setIsAILoading(true);
             setIsSynthesizing(true);
 
@@ -126,21 +130,24 @@ export default function MealSection({
             const userData = statsStr ? JSON.parse(statsStr) : { weight: 70, goalType: "maintain" };
 
             try {
-                // AI Generation with 10s timeout built into the call (as implemented in groq.ts)
-                const aiPlan = await generateMealPlanAI(
+                // Single AI call for ALL missing dates
+                const aiPlansMap = await generateMultiDayMealPlanAI(
                     userData,
                     settings,
+                    missingDates,
                     blockedFoods
                 );
-                regenerateDay(dateStr, aiPlan);
+                // Batch update all days at once
+                batchRegenerateDays(aiPlansMap);
+                console.log("[MealSection] AI successfully generated meals for:", Object.keys(aiPlansMap));
             } catch (aiError) {
-                console.warn("[MealSection] AI failed or timed out. Falling back to local engine.", aiError);
+                console.warn("[MealSection] AI failed. Falling back to local engine.", aiError);
                 
-                // Fallback to local generator
+                // Fallback: generate each missing date with local engine
                 const prefsRaw = localStorage.getItem("onboarding_preferences");
                 const mealsRaw = localStorage.getItem("onboarding_meals");
                 const prefs = prefsRaw ? JSON.parse(prefsRaw) : {};
-                const slots = mealsRaw ? JSON.parse(mealsRaw) : [{ name: "Breakfast" }, { name: "Lunch" }, { name: "Dinner" }];
+                const slots = mealsRaw ? JSON.parse(mealsRaw) : [{ name: "Breakfast" }, { name: "Lunch" }, { name: "Dinner" }, { name: "Snack" }];
 
                 const preferences: UserPreferences = {
                     selectedCategories: Object.values(prefs as Record<string, OnboardingPref>).flatMap(p => p.categories),
@@ -152,9 +159,12 @@ export default function MealSection({
                     settings: settings 
                 };
 
-                const fallbackPlan = generateMealPlan(profile, preferences);
-                regenerateDay(dateStr, fallbackPlan);
-                setErrorMessage("AI is currently busy. I've prepared a high-quality local plan for you.");
+                const fallbackMap: Record<string, GeneratedMeal[]> = {};
+                for (const dateStr of missingDates) {
+                    fallbackMap[dateStr] = generateMealPlan(profile, preferences);
+                }
+                batchRegenerateDays(fallbackMap);
+                setErrorMessage("AI is currently busy. High-quality local plans have been prepared.");
             }
 
         } catch (e) {
@@ -165,16 +175,17 @@ export default function MealSection({
             setIsSynthesizing(false);
             setIsProcessing(false);
         }
-    }, [selectedDate, settings, getDateKey, isStatsLoaded, regenerateDay, blockedFoods]);
+    }, [targetDates, settings, getDateKey, isStatsLoaded, regenerateDay, batchRegenerateDays, mealsMap, blockedFoods]);
 
     useEffect(() => {
         if (!isStateLoading && isStatsLoaded && userStats && !isAILoading) {
-            const dateStr = getDateKey(selectedDate);
-            if (!mealsMap[dateStr]) {
+            // Check if any of the target dates are missing meals
+            const anyMissing = targetDates.some(d => !mealsMap[getDateKey(d)]);
+            if (anyMissing) {
                 loadMeals();
             }
         }
-    }, [loadMeals, isStateLoading, isStatsLoaded, userStats, selectedDate, getDateKey, mealsMap, isAILoading]);
+    }, [loadMeals, isStateLoading, isStatsLoaded, userStats, targetDates, getDateKey, mealsMap, isAILoading]);
 
     const handleRegenerate = () => {
         if (window.confirm("Regenerate all meals for this period?")) {
@@ -274,11 +285,13 @@ export default function MealSection({
                 </div>
             )}
 
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
                 {errorMessage && (
                     <motion.div 
+                        key="error-banner"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
                         className="p-8 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/40 rounded-[32px] flex flex-col items-center text-center space-y-4"
                     >
                         <AlertCircle size={32} className="text-red-500" />
@@ -356,14 +369,14 @@ export default function MealSection({
 
             <AnimatePresence mode="wait">
                                 {dayMeals ? (
-                                    <div className="space-y-6">
-                                        {dayMeals.map((meal, mIdx) => (
+                                    <div key="meals-loaded" className="space-y-6">
+                                        {dayMeals.map((meal) => (
                                             <MealCard key={`${dateKey}-${meal.slot}`} meal={meal} dateKey={dateKey} />
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
-                                        {[1, 2, 3].map(s => (
+                                    <div key="meals-loading" className="space-y-4">
+                                        {[1, 2, 3, 4].map(s => (
                                             <div key={s} className="h-40 bg-slate-50/50 dark:bg-slate-900/50 rounded-[32px] border border-dashed border-slate-200 dark:border-slate-800 animate-pulse" />
                                         ))}
                                     </div>
