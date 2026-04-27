@@ -27,7 +27,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../components/dashboard/Header";
 import GroceryItemCard, { GroceryItem } from "../../../components/dashboard/GroceryItemCard";
 import OrderModal from "../../../components/dashboard/OrderModal";
-import { useTheme } from "../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import ClientOnly from "../../../components/common/ClientOnly";
 import DataReady from "../../../components/common/DataReady";
 import { GridSkeleton, SectionSkeleton } from "../../../components/common/Skeleton";

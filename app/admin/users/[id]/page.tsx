@@ -8,12 +8,9 @@ import { ConfigCard, AdminToggle } from "@/components/admin/FormControls";
 import { 
     ChevronLeft, 
     Save, 
-    Shield, 
-    Zap, 
     User as UserIcon, 
     Mail, 
     Calendar, 
-    Key,
     Activity
 } from "lucide-react";
 
@@ -45,7 +42,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         setSaving(true);
         await mockApi.updateUser(id, user);
         setSaving(false);
-        // Toast logic would go here
     };
 
     if (loading) return <div className="flex items-center justify-center h-64"><div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div></div>;
@@ -132,24 +128,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                                     ))}
                                 </div>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Subscription Plan</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {['Free', 'Paid'].map(plan => (
-                                        <button 
-                                            key={plan}
-                                            onClick={() => setUser({ ...user, plan: plan as any })}
-                                            className={`px-3 py-3 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all border ${
-                                                user.plan === plan 
-                                                    ? "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20" 
-                                                    : "bg-slate-50 dark:bg-slate-950 text-slate-500 border-slate-200 dark:border-slate-800 hover:border-amber-500"
-                                            }`}
-                                        >
-                                            {plan}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
                         </div>
                     </ConfigCard>
                 </div>
@@ -170,18 +148,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                                 enabled={user.featuresEnabled.includes('ai-rebalance')}
                                 onChange={() => handleToggleFeature('ai-rebalance')}
                             />
-                            <AdminToggle 
-                                label="BMR Calculator"
-                                description="Access to physiological metric calculations."
-                                enabled={user.featuresEnabled.includes('bmr-calc')}
-                                onChange={() => handleToggleFeature('bmr-calc')}
-                            />
-                            <AdminToggle 
-                                label="Priority AI Access"
-                                description="Grant access to premium LLM models (GPT-4o)."
-                                enabled={user.featuresEnabled.includes('priority-ai')}
-                                onChange={() => handleToggleFeature('priority-ai')}
-                            />
                         </div>
                     </ConfigCard>
 
@@ -194,9 +160,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase italic">Activity Logs Ready</h4>
                                 <p className="text-xs font-bold text-slate-400 mt-1 max-w-[280px]">Real-time audit logging for this user will appear here once the system is live.</p>
                             </div>
-                            <button className="px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
-                                Refresh Component
-                            </button>
                         </div>
                     </ConfigCard>
                 </div>

@@ -10,6 +10,13 @@ export interface AdminUser {
     featuresEnabled: string[];
 }
 
+export interface AdminStats {
+    totalUsers: number;
+    activeSubscriptions: number;
+    totalAiGenerations: number;
+    systemUptime: string;
+}
+
 export interface AIConfig {
     id: string;
     feature: string;

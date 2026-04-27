@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../components/dashboard/Header";
-import { useTheme } from "../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { useSavedPlans } from "../../../lib/hooks/useSavedPlans";
 import ClientOnly from "../../../components/common/ClientOnly";
 import DataReady from "../../../components/common/DataReady";

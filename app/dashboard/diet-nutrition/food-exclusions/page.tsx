@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useTheme } from "../../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import Header from "../../../../components/dashboard/Header";
 import ClientOnly from "../../../../components/common/ClientOnly";
 import { useFoodExclusions } from "../../../../lib/hooks/useFoodExclusions";

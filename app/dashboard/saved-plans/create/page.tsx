@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../../components/dashboard/Header";
 import { useSavedPlans } from "../../../../lib/hooks/useSavedPlans";
 import { SavedPlan } from "../../../../types/saved-plans";
-import { useTheme } from "../../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 function SavedPlanFormContent() {
     const router = useRouter();

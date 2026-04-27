@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Theme } from "@/components/theme/ThemeProvider";
 import { 
     ChevronLeft, 
     ChevronRight, 
@@ -26,8 +27,8 @@ interface HeaderProps {
     setViewMode?: (mode: "day" | "week") => void;
     selectedDate?: Date | { start: Date; end: Date | null };
     onDateChange?: (date: Date | { start: Date; end: Date }) => void;
-    theme: "light" | "dark" | "system";
-    onThemeChange: (theme: "light" | "dark" | "system") => void;
+    theme: Theme | undefined;
+    onThemeChange: (theme: Theme) => void;
     isProcessing?: boolean;
     title?: string;
 }

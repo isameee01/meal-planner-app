@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import DataTable from "@/components/admin/DataTable";
 import { mockApi } from "@/lib/admin/mock-api";
 import { AdminUser } from "@/lib/admin/mock-data";
-import { Edit2, Ban, CheckCircle2, UserPlus, Filter } from "lucide-react";
+import { Edit2, Ban, CheckCircle2, UserPlus } from "lucide-react";
 
 export default function UsersListPage() {
     const router = useRouter();
@@ -28,7 +28,7 @@ export default function UsersListPage() {
         loadUsers();
     };
 
-    if (loading) return <div className="flex items-center justify-center h-64"><div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
+    if (loading) return <div className="flex items-center justify-center h-64"><div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div></div>;
 
     return (
         <div className="space-y-10">

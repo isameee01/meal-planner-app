@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus, Link as LinkIcon, ChefHat, Salad, UtensilsCrossed } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../components/dashboard/Header";
-import { useTheme } from "../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { useMounted } from "../../../lib/hooks/useMounted";
 import { useCustomFoods } from "../../../lib/hooks/useCustomFoods";
 import { useCustomRecipes } from "../../../lib/hooks/useCustomRecipes";

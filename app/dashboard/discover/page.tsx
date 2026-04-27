@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useDiscover, INITIAL_FILTERS } from "../../../lib/hooks/useDiscover";
 import { useDebounce } from "../../../lib/hooks/useDebounce";
 import { useMounted } from "../../../lib/hooks/useMounted";
-import { useTheme } from "../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { useRouter } from "next/navigation";
 import Header from "../../../components/dashboard/Header";
 import ClientOnly from "../../../components/common/ClientOnly";

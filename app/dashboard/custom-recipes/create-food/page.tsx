@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Upload, Camera, Trash2, Check, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../../components/dashboard/Header";
-import { useTheme } from "../../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { useCustomFoods } from "../../../../lib/hooks/useCustomFoods";
 import { CustomFood } from "../../../../types/custom-recipes";
 

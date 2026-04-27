@@ -1,18 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import StatCard from "@/components/admin/StatCard";
-import DataTable from "@/components/admin/DataTable";
 import { mockApi } from "@/lib/admin/mock-api";
-import { AdminUser } from "@/lib/admin/mock-data";
+import { AdminStats } from "@/lib/admin/mock-data";
+import StatCard from "@/components/admin/StatCard";
 import { 
     Users, 
-    Activity, 
-    DollarSign, 
     Zap, 
-    UserPlus, 
+    Activity, 
+    TrendingUp, 
     ShieldCheck, 
-    Clock
+    Clock 
 } from "lucide-react";
 import { 
     AreaChart, 
@@ -26,137 +24,123 @@ import {
     Bar
 } from "recharts";
 
-const MOCK_CHART_DATA = [
-    { name: "Mon", users: 400, requests: 2400 },
-    { name: "Tue", users: 520, requests: 3100 },
-    { name: "Wed", users: 480, requests: 2900 },
-    { name: "Thu", users: 610, requests: 3800 },
-    { name: "Fri", users: 750, requests: 4200 },
-    { name: "Sat", users: 900, requests: 5100 },
-    { name: "Sun", users: 850, requests: 4800 },
-];
-
-export default function AdminDashboardPage() {
-    const [users, setUsers] = useState<AdminUser[]>([]);
+export default function AdminDashboard() {
+    const [stats, setStats] = useState<AdminStats | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        mockApi.getUsers().then(val => {
-            setUsers(val);
+        mockApi.getStats().then(data => {
+            setStats(data);
             setLoading(false);
         });
     }, []);
 
-    const stats = [
-        { title: "Total Users", value: users.length, icon: Users, color: "brand-primary", trend: { value: "12%", positive: true } },
-        { title: "Active Users", value: users.filter(u => u.status === 'Active').length, icon: Activity, color: "emerald", trend: { value: "5%", positive: true } },
-        { title: "Paid Users", value: users.filter(u => u.plan === 'Paid').length, icon: DollarSign, color: "amber", trend: { value: "8%", positive: true } },
-        { title: "API Requests", value: "24.5k", icon: Zap, color: "brand-secondary", trend: { value: "24%", positive: true } },
-    ] as const;
+    if (loading || !stats) return <div className="flex items-center justify-center h-64"><div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div></div>;
 
-    if (loading) return <div className="flex items-center justify-center h-64"><div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div></div>;
+    const chartData = [
+        { name: 'Mon', users: 400, revenue: 2400 },
+        { name: 'Tue', users: 300, revenue: 1398 },
+        { name: 'Wed', users: 200, revenue: 9800 },
+        { name: 'Thu', users: 278, revenue: 3908 },
+        { name: 'Fri', users: 189, revenue: 4800 },
+        { name: 'Sat', users: 239, revenue: 3800 },
+        { name: 'Sun', users: 349, revenue: 4300 },
+    ];
 
     return (
         <div className="space-y-10">
-            {/* Header section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h1 className="text-4xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Dashboard Overview</h1>
-                    <p className="text-slate-500 font-bold mt-2">Welcome back. Here is what's happening with your platform today.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="px-5 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm">
-                        <Clock size={18} className="text-brand-primary" />
-                        <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Last 24 Hours</span>
-                    </div>
-                </div>
+            {/* Header */}
+            <div>
+                <h1 className="text-4xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Overview</h1>
+                <p className="text-slate-500 font-bold mt-2">Welcome back to the CustomDailyDiet Master Control.</p>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                {stats.map((stat) => (
-                    <StatCard key={stat.title} {...stat} />
-                ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    title="Total Users" 
+                    value={stats.totalUsers.toLocaleString()} 
+                    trend={{ value: "+12%", positive: true }} 
+                    icon={Users} 
+                    color="brand-primary"
+                />
+                <StatCard 
+                    title="Active Subscriptions" 
+                    value={stats.activeSubscriptions.toLocaleString()} 
+                    trend={{ value: "+5.3%", positive: true }} 
+                    icon={ShieldCheck} 
+                    color="brand-secondary"
+                />
+                <StatCard 
+                    title="AI Generations" 
+                    value={stats.totalAiGenerations.toLocaleString()} 
+                    trend={{ value: "+254", positive: true }} 
+                    icon={Zap} 
+                    color="emerald"
+                />
+                <StatCard 
+                    title="System Uptime" 
+                    value="99.99%" 
+                    trend={{ value: "Stable", positive: true }} 
+                    icon={Activity} 
+                    color="emerald"
+                />
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/40 dark:shadow-none">
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none">
                     <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">User Growth</h3>
-                        <div className="px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-lg text-xs font-black">Weekly</div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Platform Growth</h3>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">New users per week</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400">
+                            <TrendingUp size={20} />
+                        </div>
                     </div>
-                    <div className="h-[300px] w-full">
+                    <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={MOCK_CHART_DATA}>
+                            <AreaChart data={chartData}>
                                 <defs>
                                     <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--color-brand-primary)" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="var(--color-brand-primary)" stopOpacity={0}/>
+                                        <stop offset="5%" stopColor="#4AB034" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#4AB034" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }} />
-                                <Tooltip 
-                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '16px', color: '#fff', fontWeight: 'bold' }}
-                                    itemStyle={{ color: '#fff' }}
-                                />
-                                <Area type="monotone" dataKey="users" stroke="var(--color-brand-primary)" strokeWidth={4} fillOpacity={1} fill="url(#colorUsers)" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
+                                <Tooltip />
+                                <Area type="monotone" dataKey="users" stroke="#4AB034" strokeWidth={4} fillOpacity={1} fill="url(#colorUsers)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/40 dark:shadow-none">
+                <div className="p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none">
                     <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Tool Usage</h3>
-                        <div className="px-3 py-1 bg-brand-secondary/10 text-brand-secondary rounded-lg text-xs font-black">Performance</div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Revenue Metrics</h3>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Global platform performance</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400">
+                            <Clock size={20} />
+                        </div>
                     </div>
-                    <div className="h-[300px] w-full">
+                    <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={MOCK_CHART_DATA}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 700, fill: '#94a3b8' }} />
-                                <Tooltip 
-                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '16px', color: '#fff', fontWeight: 'bold' }}
-                                    cursor={{ fill: '#f1f5f9' }}
-                                />
-                                <Bar dataKey="requests" fill="var(--color-brand-secondary)" radius={[10, 10, 0, 0]} barSize={40} />
+                            <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
+                                <Tooltip />
+                                <Bar dataKey="revenue" fill="#F05A28" radius={[8, 8, 0, 0]} barSize={24} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
             </div>
-
-            {/* Recent Users Table */}
-            <DataTable 
-                title="Recent User Activity"
-                columns={[
-                    { key: 'name', label: 'User', render: (u) => (
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-xs font-black">{u.name[0]}</div>
-                            <span>{u.name}</span>
-                        </div>
-                    )},
-                    { key: 'email', label: 'Email' },
-                    { key: 'plan', label: 'Plan', render: (u) => (
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${u.plan === 'Paid' ? "bg-amber-500/10 text-amber-500" : "bg-slate-500/10 text-slate-500"}`}>
-                            {u.plan}
-                        </span>
-                    )},
-                    { key: 'status', label: 'Status', render: (u) => (
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${u.status === 'Active' ? "bg-emerald-500" : "bg-rose-500"}`}></div>
-                            <span className="text-xs font-bold">{u.status}</span>
-                        </div>
-                    )},
-                    { key: 'createdAt', label: 'Joined' }
-                ]}
-                data={users.slice(0, 5)}
-                searchPlaceholder="Filter recent activity..."
-            />
         </div>
     );
 }

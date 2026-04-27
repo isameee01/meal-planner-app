@@ -9,7 +9,7 @@ import SavedFoodsPanel from "../../components/dashboard/SavedFoodsPanel";
 import OnboardingModal from "./OnboardingModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { useTheme } from "../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { useMounted } from "../../lib/hooks/useMounted";
 import ClientOnly from "../../components/common/ClientOnly";
 import DataReady from "../../components/common/DataReady";

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Link as LinkIcon, Loader2, Sparkles, Globe, ShieldCheck, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../../components/dashboard/Header";
-import { useTheme } from "../../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 export default function ImportRecipePage() {
     const [collapsed, setCollapsed] = useState(false);

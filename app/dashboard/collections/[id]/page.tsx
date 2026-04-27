@@ -25,7 +25,7 @@ import { getFoodById } from "../../../../lib/storage-utils";
 import { FEATURED_COLLECTIONS, STATIC_FOOD_DATA } from "../../../../lib/constants/collections-data";
 import CustomItemCard from "../../../../components/dashboard/CustomItemCard";
 import CustomItemModal from "../../../../components/dashboard/CustomItemModal";
-import { useTheme } from "../../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import ClientOnly from "../../../../components/common/ClientOnly";
 import DataReady from "../../../../components/common/DataReady";
 import { GridSkeleton, PageHeaderSkeleton } from "../../../../components/common/Skeleton";

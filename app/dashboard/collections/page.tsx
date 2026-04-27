@@ -25,7 +25,7 @@ import { FEATURED_COLLECTIONS } from "../../../lib/constants/collections-data";
 import ClientOnly from "../../../components/common/ClientOnly";
 import DataReady from "../../../components/common/DataReady";
 import { GridSkeleton } from "../../../components/common/Skeleton";
-import { useTheme } from "../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 export default function CollectionsDashboard() {
     const mounted = useMounted();

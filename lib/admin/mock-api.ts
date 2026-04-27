@@ -7,6 +7,7 @@ import {
     SaaSConfig, 
     AdConfig, 
     ToolItem,
+    AdminStats,
     INITIAL_USERS,
     INITIAL_AI_CONFIGS,
     INITIAL_APIS,
@@ -41,6 +42,15 @@ export const mockApi = {
         await delay(600);
         users = users.map(u => u.id === id ? { ...u, ...updates } : u);
         return users.find(u => u.id === id)!;
+    },
+    getStats: async (): Promise<AdminStats> => {
+        await delay(400);
+        return {
+            totalUsers: users.length,
+            activeSubscriptions: users.filter(u => u.plan === 'Paid').length,
+            totalAiGenerations: 12543,
+            systemUptime: '99.99%',
+        };
     },
 
     // AI Configs

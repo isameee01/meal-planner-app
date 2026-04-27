@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Header from "../../../../components/dashboard/Header";
 import { useCollections } from "../../../../lib/hooks/useCollections";
 import { Collection } from "../../../../types/collections";
-import { useTheme } from "../../../../components/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 export default function CreateCollectionPage() {
     const router = useRouter();
