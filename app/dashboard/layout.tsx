@@ -5,6 +5,7 @@ import Sidebar from "../../components/dashboard/Sidebar";
 import { useMounted } from "../../lib/hooks/useMounted";
 import { FoodStateProvider } from "../../lib/contexts/FoodStateContext";
 import { MealStateProvider } from "../../lib/contexts/MealStateContext";
+import AdPopup from "../../components/ads/AdPopup";
 
 export default function DashboardLayout({
   children,
@@ -45,6 +46,7 @@ export default function DashboardLayout({
           
           <main className="flex-1 min-w-0 h-screen overflow-y-auto relative scrollbar-hide">
             {children}
+            <AdPopup />
           </main>
         </div>
       </MealStateProvider>

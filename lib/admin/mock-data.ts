@@ -3,9 +3,10 @@ export interface AdminUser {
     id: string;
     name: string;
     email: string;
+    password?: string;
     role: 'Admin' | 'Manager' | 'User';
-    plan: 'Free' | 'Paid';
-    status: 'Active' | 'Blocked';
+    plan: 'Free' | 'Pro' | 'Premium' | 'Paid';
+    status: 'Active' | 'Blocked' | 'Disabled';
     createdAt: string;
     featuresEnabled: string[];
 }
