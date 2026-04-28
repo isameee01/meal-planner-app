@@ -47,9 +47,10 @@ export default function PhysicalStatsPage() {
     } = useUserProfile();
 
     const { 
+        stats: legacyStats,
         uploadImage, 
         removeImage, 
-        status: imageStatus, 
+        status, 
         isUploading,
         setError: setImageError 
     } = useUserStats();
@@ -64,7 +65,8 @@ export default function PhysicalStatsPage() {
         activityLevel: profile.activityLevel,
         bodyFat: "medium" as BodyFatLevel, // Profile doesn't store this yet, default to medium
         height: { ft: Math.floor(profile.heightCm / 30.48), in: Math.round((profile.heightCm % 30.48) / 2.54) },
-        weightUnit: "kg" as const
+        weightUnit: "kg" as const,
+        profileImage: legacyStats.profileImage
     } : null;
 
     const isLoaded = !profileLoading;
@@ -92,7 +94,7 @@ export default function PhysicalStatsPage() {
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    if (!isLoaded) {
+    if (!isLoaded || !stats) {
         return (
             <div className="flex-1 flex items-center justify-center">
                 <Loader2 className="animate-spin text-emerald-500" size={32} />
@@ -252,8 +254,8 @@ export default function PhysicalStatsPage() {
                                         <Loader2 size={32} className="animate-spin text-emerald-500 mb-2" />
                                         <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Uploading...</span>
                                     </div>
-                                ) : stats.profileImage ? (
-                                    <img src={stats.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                                ) : stats?.profileImage ? (
+                                    <img src={stats.profileImage as string} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-3xl font-black">
                                         {getInitials()}
@@ -437,6 +439,9 @@ export default function PhysicalStatsPage() {
                                     />
                                     <span className="text-[10px] font-bold text-slate-400 pb-1.5 uppercase tracking-widest">Years</span>
                                 </div>
+                            </div>
+                        </div>
+
                         {/* Diet Type Selector */}
                         <div className="space-y-4">
                             <div className="flex items-center space-x-2 text-slate-400 uppercase tracking-widest text-[10px] font-black px-2">

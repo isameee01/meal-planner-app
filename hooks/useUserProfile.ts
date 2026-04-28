@@ -87,7 +87,7 @@ export function useUserProfile() {
                 if (cached) {
                     currentProfile = JSON.parse(cached);
                 } else {
-                    const fallbackBmr = calculateBMR({ weight: 70, height: 170, age: 30, gender: "male" });
+                    const fallbackBmr = calculateBMR({ weight: 70, height: 170, age: 30, gender: "male", activityLevel: "moderately_active" });
                     const fallbackTdee = calculateTDEE(fallbackBmr, "moderately_active");
                     const fallbackNut = calculateNutritionProfile(fallbackTdee, "maintain");
                     currentProfile = {
@@ -118,7 +118,8 @@ export function useUserProfile() {
                 weight: merged.weightKg,
                 height: merged.heightCm,
                 age: merged.age,
-                gender: merged.sex
+                gender: merged.sex,
+                activityLevel: merged.activityLevel
             });
             const tdee = calculateTDEE(bmr, merged.activityLevel);
             const nutrition = calculateNutritionProfile(
@@ -139,9 +140,9 @@ export function useUserProfile() {
                 height_cm: merged.heightCm,
                 age: merged.age,
                 sex: merged.sex,
-                activity_level: merged.activity_level || merged.activityLevel,
-                goal_type: merged.goal_type || merged.goalType,
-                goal_mode: merged.goal_mode || merged.goalMode,
+                activity_level: merged.activityLevel,
+                goal_type: merged.goalType,
+                goal_mode: merged.goalMode,
                 target_weight_kg: merged.targetWeightKg,
                 weekly_change_kg: merged.weeklyChangeKg,
                 diet_type: merged.dietType,

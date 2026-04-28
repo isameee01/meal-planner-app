@@ -9,6 +9,7 @@ interface DropdownItem {
     onClick: () => void;
     icon?: React.ReactNode;
     variant?: "default" | "danger";
+    disabled?: boolean;
 }
 
 interface DropdownMenuProps {
@@ -58,14 +59,18 @@ export default function DropdownMenu({ items, trigger, align = "right" }: Dropdo
                         {items.map((item, index) => (
                             <button
                                 key={index}
+                                disabled={item.disabled}
                                 onClick={() => {
+                                    if (item.disabled) return;
                                     item.onClick();
                                     setIsOpen(false);
                                 }}
                                 className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                                    item.variant === "danger"
-                                        ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                                    item.disabled
+                                        ? "opacity-30 cursor-not-allowed grayscale"
+                                        : item.variant === "danger"
+                                            ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                                 }`}
                             >
                                 {item.icon && <span className="text-current">{item.icon}</span>}

@@ -175,7 +175,18 @@ export default function MealSection({
 
                 const fallbackMap: Record<string, GeneratedMeal[]> = {};
                 for (const dateStr of missingDates) {
-                    fallbackMap[dateStr] = generateMealPlan(userProfile, preferences);
+                    if (userProfile) {
+                        const localNutritionProfile = {
+                            tdee: userProfile.calorieTarget,
+                            calories: userProfile.calorieTarget,
+                            macros: {
+                                protein: userProfile.proteinTarget,
+                                carbs: userProfile.carbsTarget,
+                                fat: userProfile.fatsTarget
+                            }
+                        };
+                        fallbackMap[dateStr] = generateMealPlan(localNutritionProfile as any, preferences);
+                    }
                 }
                 batchRegenerateDays(fallbackMap);
                 setErrorMessage("AI is currently busy. High-quality local plans have been prepared.");
@@ -271,12 +282,15 @@ export default function MealSection({
                     </div>
 
                     <div className="flex items-center space-x-3">
-                        <DropdownMenu items={shareItems}>
-                            <button className="h-12 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-200/50 dark:shadow-none">
-                                <Share2 size={16} />
-                                Share Plan
-                            </button>
-                        </DropdownMenu>
+                        <DropdownMenu 
+                            items={shareItems as any} 
+                            trigger={
+                                <div className="h-12 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-200/50 dark:shadow-none">
+                                    <Share2 size={16} />
+                                    Share Plan
+                                </div>
+                            }
+                        />
                     </div>
                 </div>
             )}

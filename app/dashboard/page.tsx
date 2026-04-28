@@ -34,6 +34,7 @@ export default function DashboardPage() {
     const [viewMode, setViewMode] = useState<"day" | "week">("day");
     const [selectedDate, setSelectedDate] = useState<SelectedDateState>({ day: new Date() });
     const [isProcessing, setIsProcessing] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     
     const { theme, setTheme } = useTheme();
     const router = useRouter();

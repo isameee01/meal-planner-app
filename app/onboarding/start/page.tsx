@@ -18,6 +18,8 @@ export default function StartPage() {
              <Loader2 className="animate-spin text-emerald-500" size={32} />
         </div>
     );
+
+    return (
         <div className="flex flex-col items-center text-center space-y-8">
             <motion.div 
                 initial={{ rotate: -10, scale: 0.8 }}

@@ -59,8 +59,8 @@ export default function WeightGoalPage() {
     const updateGoal = (updates: any) => updateProfile(updates);
     const markRecalculated = () => {};
     const addTarget = () => {};
-    const statsStatus = loading ? "saving" : "idle"; // Rough mapping
-    const goalStatus = loading ? "saving" : "idle";
+    const statsStatus: "idle" | "saving" | "saved" | "error" = loading ? "saving" : "idle"; // Rough mapping
+    const goalStatus: "idle" | "saving" | "saved" | "error" = loading ? "saving" : "idle";
 
     const [weightInput, setWeightInput] = useState("");
     const [targetWeightInput, setTargetWeightInput] = useState("");
@@ -78,14 +78,14 @@ export default function WeightGoalPage() {
     }, []);
 
     useEffect(() => {
-        if (statsLoaded) {
+        if (stats) {
             const display = formatWeight(stats.weight, mapUnitSystemToWeightUnit(currentUnit));
             setWeightInput(display.primaryValue.toString());
         }
-    }, [statsLoaded, stats.weight, currentUnit]);
+    }, [stats?.weight, currentUnit]);
 
     useEffect(() => {
-        if (goalLoaded) {
+        if (goal) {
             const displayTarget = formatWeight(goal.targetWeightKg || 70, mapUnitSystemToWeightUnit(currentUnit));
             setTargetWeightInput(displayTarget.primaryValue.toString());
             
@@ -93,10 +93,10 @@ export default function WeightGoalPage() {
             const displayChange = formatWeight(goal.weeklyChangeKg || 0.5, mapUnitSystemToWeightUnit(currentUnit));
             setWeeklyChangeInput(displayChange.primaryValue.toString());
         }
-    }, [goalLoaded, goal.targetWeightKg, goal.weeklyChangeKg, currentUnit]);
+    }, [goal?.targetWeightKg, goal?.weeklyChangeKg, currentUnit]);
 
     useEffect(() => {
-        if (!statsLoaded) return;
+        if (!stats) return;
 
         // Convert height to cm
         const heightCm = currentUnit === "metric" 
@@ -120,7 +120,7 @@ export default function WeightGoalPage() {
         setTdee(calculatedTdee);
 
         console.log("Recalculated BMR/TDEE:", { weight: stats.weight, heightCm, age: stats.age, gender, bmr: calculatedBmr, tdee: calculatedTdee });
-    }, [statsLoaded, stats.weight, stats.height, stats.heightCm, stats.age, stats.sex, stats.activityLevel, currentUnit]);
+    }, [stats?.weight, stats?.height, stats?.heightCm, stats?.age, stats?.sex, stats?.activityLevel, currentUnit]);
 
     if (!mounted || !statsLoaded || !goalLoaded) {
         return (
@@ -162,13 +162,12 @@ export default function WeightGoalPage() {
     };
 
     const handleUpdateNutrition = () => {
-        const newTarget = generateTargetFromProfile();
-        addTarget(newTarget as any);
-        markRecalculated();
+        // Redundant as updateProfile already recalculates and saves targets
+        updateProfile({});
     };
 
-    const isSaving = statsStatus === "saving" || goalStatus === "saving";
-    const isSaved = statsStatus === "saved" || goalStatus === "saved";
+    const isSaving = (statsStatus as string) === "saving" || (goalStatus as string) === "saving";
+    const isSaved = (statsStatus as string) === "saved" || (goalStatus as string) === "saved";
 
     return (
         <div className="flex-1 p-6 lg:p-12 max-w-5xl mx-auto space-y-12">
@@ -212,7 +211,7 @@ export default function WeightGoalPage() {
 
             {/* Warning Banner */}
             <AnimatePresence>
-                {goal.needsRecalculation && (
+                {goal?.needsRecalculation && (
                     <motion.div 
                         initial={{ height: 0, opacity: 0, y: -20 }}
                         animate={{ height: "auto", opacity: 1, y: 0 }}
@@ -264,8 +263,8 @@ export default function WeightGoalPage() {
                             </div>
                             <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                                 <WeightDisplay 
-                                    weightKg={stats.weight} 
-                                    unit={stats.weightUnit} 
+                                    weightKg={stats?.weight || 70} 
+                                    unit={mapUnitSystemToWeightUnit(currentUnit)} 
                                     size="md"
                                 />
                             </div>
@@ -309,7 +308,7 @@ export default function WeightGoalPage() {
                                 key={mode}
                                 onClick={() => updateGoal({ goalMode: mode as GoalMode })}
                                 className={`flex-1 py-3 rounded-xl text-xs font-bold capitalize transition-all duration-300 ${
-                                    goal.goalMode === mode 
+                                    goal?.goalMode === mode 
                                         ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" 
                                         : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                                 }`}
@@ -321,7 +320,7 @@ export default function WeightGoalPage() {
 
                     <div className="flex-1 flex flex-col justify-center py-4">
                         <AnimatePresence mode="wait">
-                            {goal.goalMode === "general" ? (
+                            {goal?.goalMode === "general" ? (
                                 <motion.div 
                                     key="general"
                                     initial={{ opacity: 0, x: 20 }}
@@ -338,7 +337,7 @@ export default function WeightGoalPage() {
                                             key={type.id}
                                             onClick={() => updateGoal({ goalType: type.id as GoalType })}
                                             className={`w-full flex items-center p-5 rounded-[28px] border-2 transition-all ${
-                                                goal.goalType === type.id 
+                                                goal?.goalType === type.id 
                                                     ? "bg-white dark:bg-slate-800 border-emerald-500 shadow-xl shadow-emerald-50 dark:shadow-none -translate-y-1" 
                                                     : "bg-slate-50 dark:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                                             }`}
@@ -346,10 +345,10 @@ export default function WeightGoalPage() {
                                             <div className={`w-12 h-12 ${type.bg} rounded-2xl flex items-center justify-center ${type.color} mr-4`}>
                                                 <type.icon size={24} />
                                             </div>
-                                            <span className={`text-sm font-bold ${goal.goalType === type.id ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}>
+                                            <span className={`text-sm font-bold ${goal?.goalType === type.id ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}>
                                                 {type.label}
                                             </span>
-                                            {goal.goalType === type.id && (
+                                            {goal?.goalType === type.id && (
                                                 <CheckCircle2 className="ml-auto text-emerald-500" size={20} />
                                             )}
                                         </button>
@@ -371,7 +370,7 @@ export default function WeightGoalPage() {
                                         <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
                                             <input 
                                                 type="number"
-                                                step={stats.weightUnit === "kg" ? "0.1" : "1"}
+                                                step={mapUnitSystemToWeightUnit(currentUnit) === "kg" ? "0.1" : "1"}
                                                 value={targetWeightInput}
                                                 onChange={(e) => handleExactWeightChange("target", e.target.value)}
                                                 className="w-full text-2xl font-black text-slate-900 dark:text-white bg-transparent border-none p-0 focus:ring-0"
@@ -379,7 +378,7 @@ export default function WeightGoalPage() {
                                         </div>
                                         <div className="px-2">
                                              <WeightDisplay 
-                                                weightKg={goal.targetWeightKg || 70} 
+                                                weightKg={goal?.targetWeightKg || 70} 
                                                 unit={mapUnitSystemToWeightUnit(currentUnit)} 
                                                 size="sm"
                                             />
@@ -402,7 +401,7 @@ export default function WeightGoalPage() {
                                         </div>
                                         <div className="px-2">
                                              <p className="text-[10px] font-bold text-slate-400 tracking-tight italic">
-                                                Equivalent: {formatWeight(goal.weeklyChangeKg || 0.5, mapUnitSystemToWeightUnit(currentUnit)).secondary}/week
+                                                Equivalent: {formatWeight(goal?.weeklyChangeKg || 0.5, mapUnitSystemToWeightUnit(currentUnit)).secondary}/week
                                              </p>
                                         </div>
                                         <p className="text-[10px] text-slate-400 font-medium px-2 italic">Recommended: 0.25 - 0.75 {currentUnit}</p>
