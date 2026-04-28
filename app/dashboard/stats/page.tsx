@@ -16,11 +16,13 @@ import {
     Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUserProfile } from "../../../hooks/useUserProfile";
 import { useUserStats } from "../../../lib/hooks/useUserStats";
-import { ActivityLevelId, Sex, BodyFatLevel } from "../../../types/user";
+import { ActivityLevelId, Sex, BodyFatLevel, DietType } from "../../../types/user";
 import { WeightDisplay } from "../../../components/dashboard/WeightDisplay";
 import { formatWeight, convertToKg } from "../../../lib/utils/weight";
 import { useGeneratorSettings } from "../../../lib/hooks/useGeneratorSettings";
+import { AVAILABLE_DIETS } from "../../../lib/constants/diets";
 
 const ACTIVITY_LEVELS = [
     { id: "sedentary", name: "Sedentary", desc: "Little to no exercise, office job", icon: "🛋️" },
@@ -38,16 +40,51 @@ const BODY_FAT_LEVELS = [
 
 export default function PhysicalStatsPage() {
     const { 
-        stats, 
-        updateStats, 
+        profile,
+        updateProfile,
+        loading: profileLoading,
+        error: profileError
+    } = useUserProfile();
+
+    const { 
         uploadImage, 
         removeImage, 
-        status, 
+        status: imageStatus, 
         isUploading,
-        isLoaded, 
-        error, 
-        setError 
+        setError: setImageError 
     } = useUserStats();
+
+    // Mapping profile to stats for compatibility with existing UI logic
+    const stats = profile ? {
+        name: profile.fullName,
+        sex: profile.sex,
+        weight: profile.weightKg,
+        heightCm: profile.heightCm,
+        age: profile.age,
+        activityLevel: profile.activityLevel,
+        bodyFat: "medium" as BodyFatLevel, // Profile doesn't store this yet, default to medium
+        height: { ft: Math.floor(profile.heightCm / 30.48), in: Math.round((profile.heightCm % 30.48) / 2.54) },
+        weightUnit: "kg" as const
+    } : null;
+
+    const isLoaded = !profileLoading;
+    const error = profileError;
+    const updateStats = (updates: any) => {
+        // Map stats updates back to profile updates
+        const profileUpdates: any = {};
+        if (updates.name !== undefined) profileUpdates.fullName = updates.name;
+        if (updates.weight !== undefined) profileUpdates.weightKg = updates.weight;
+        if (updates.heightCm !== undefined) profileUpdates.heightCm = updates.heightCm;
+        if (updates.age !== undefined) profileUpdates.age = updates.age;
+        if (updates.sex !== undefined) profileUpdates.sex = updates.sex;
+        if (updates.activityLevel !== undefined) profileUpdates.activityLevel = updates.activityLevel;
+        if (updates.height !== undefined) {
+             profileUpdates.heightCm = (updates.height.ft * 30.48) + (updates.height.in * 2.54);
+        }
+        updateProfile(profileUpdates);
+    };
+
+    const setError = (err: string | null) => setImageError(err);
 
     const { settings } = useGeneratorSettings();
     const currentUnit = settings.units;
@@ -400,6 +437,33 @@ export default function PhysicalStatsPage() {
                                     />
                                     <span className="text-[10px] font-bold text-slate-400 pb-1.5 uppercase tracking-widest">Years</span>
                                 </div>
+                        {/* Diet Type Selector */}
+                        <div className="space-y-4">
+                            <div className="flex items-center space-x-2 text-slate-400 uppercase tracking-widest text-[10px] font-black px-2">
+                                <Activity size={14} />
+                                <span>Dietary Preference</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {AVAILABLE_DIETS.map((diet) => (
+                                    <button
+                                        key={diet.id}
+                                        onClick={() => updateProfile({ dietType: diet.type as DietType })}
+                                        className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group ${
+                                            profile?.dietType === diet.type 
+                                                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10" 
+                                                : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-200"
+                                        }`}
+                                    >
+                                        <p className={`font-black uppercase tracking-tight text-[10px] ${profile?.dietType === diet.type ? "text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300"}`}>
+                                            {diet.label}
+                                        </p>
+                                        {profile?.dietType === diet.type && (
+                                            <div className="absolute top-2 right-2 text-emerald-500">
+                                                <CheckCircle2 size={12} />
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 

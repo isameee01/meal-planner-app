@@ -48,13 +48,19 @@ export default function AboutPage() {
 
     const handleContinue = () => {
         // Validation Rules
-        if (metrics.weight <= 0) return setError("Please enter a valid weight");
-        if (metrics.age <= 0) return setError("Please enter a valid age");
-        if (metrics.ft <= 0) return setError("Please enter a valid height");
+        if (metrics.weight <= 0 || metrics.weight > 500) return setError("Please enter a valid weight (1-500kg)");
+        if (metrics.age <=0 || metrics.age > 120) return setError("Please enter a valid age (1-120)");
+        if (metrics.ft <= 0 || metrics.ft > 10) return setError("Please enter a valid height");
 
         // Internal Conversion: Feet/Inches to CM for calculations
-        const heightCm = Math.round((metrics.ft * 30.48) + (metrics.in * 2.54));
+        // 1ft = 30.48cm, 1in = 2.54cm. Using precise conversion.
+        const totalInches = (metrics.ft * 12) + metrics.in;
+        const heightCm = Math.round(totalInches * 2.54);
         
+        if (heightCm < 50 || heightCm > 300) {
+            return setError("Calculated height seems incorrect. Please check ft/in.");
+        }
+
         localStorage.setItem("onboarding_about", JSON.stringify({
             ...metrics,
             height: heightCm // Store cm for Mifflin-St Jeor

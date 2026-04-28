@@ -6,9 +6,9 @@ import {
     calculateBMR, 
     calculateTDEE, 
     calculateNutritionProfile, 
-    PhysicalMetrics, 
-    FitnessGoal 
+    PhysicalMetrics 
 } from "../../../lib/nutrition";
+import { GoalType } from "../../../types/user";
 import { 
     ArrowRight, 
     ArrowLeft, 
@@ -61,13 +61,20 @@ export default function SummaryPage() {
             if (metrics.weight > 0 && metrics.height > 0 && metrics.age > 0) {
                 const bmr = calculateBMR(metrics);
                 const tdee = calculateTDEE(bmr, metrics.activityLevel);
-                const nutrition = calculateNutritionProfile(tdee, goalStored as FitnessGoal);
+                const nutrition = calculateNutritionProfile(tdee, goalStored as GoalType);
                 
+                // Calculate actual percentages for UI bars
+                const totalMacrosKcal = (nutrition.macros.protein * 4) + (nutrition.macros.carbs * 4) + (nutrition.macros.fat * 9);
+                const pPct = Math.round((nutrition.macros.protein * 4 / totalMacrosKcal) * 100);
+                const cPct = Math.round((nutrition.macros.carbs * 4 / totalMacrosKcal) * 100);
+                const fPct = 100 - pPct - cPct;
+
                 setProfile({
                     ...nutrition,
                     bmr,
                     goal: goalStored,
-                    metrics
+                    metrics,
+                    percentages: { pPct, cPct, fPct }
                 });
                 setIsValid(true);
             } else {
@@ -143,9 +150,9 @@ export default function SummaryPage() {
 
                         {/* Macro Split */}
                         <div className="p-8 bg-slate-50/50 dark:bg-slate-800/80 rounded-[32px] border border-slate-100 dark:border-slate-700 space-y-6">
-                            <MacroBar label="Protein" value={profile.macros.protein} unit="g" color="bg-purple-500" percentage={30} />
-                            <MacroBar label="Carbs" value={profile.macros.carbs} unit="g" color="bg-orange-500" percentage={40} />
-                            <MacroBar label="Fats" value={profile.macros.fat} unit="g" color="bg-teal-500" percentage={30} />
+                            <MacroBar label="Protein" value={profile.macros.protein} unit="g" color="bg-purple-500" percentage={profile.percentages.pPct} />
+                            <MacroBar label="Carbs" value={profile.macros.carbs} unit="g" color="bg-orange-500" percentage={profile.percentages.cPct} />
+                            <MacroBar label="Fats" value={profile.macros.fat} unit="g" color="bg-teal-500" percentage={profile.percentages.fPct} />
                         </div>
 
                         {/* Additional Stats */}

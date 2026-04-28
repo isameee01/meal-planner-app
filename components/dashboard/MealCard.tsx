@@ -22,6 +22,7 @@ import { FoodItem } from "../../lib/food-db";
 import { useNutritionTargets } from "../../lib/hooks/useNutritionTargets";
 import { useUserStats } from "../../lib/hooks/useUserStats";
 import { useMealState } from "../../lib/contexts/MealStateContext";
+import { useAdminSettings } from "../../hooks/useAdminSettings";
 import { GeneratedMeal } from "../../lib/meal-planner";
 import { FoodReplacementModal } from "./FoodReplacementModal";
 
@@ -38,6 +39,7 @@ export const MealCard = ({ meal, dateKey }: MealCardProps) => {
     const { updateItemServing, replaceFood, rebalanceDay, addItemToMeal, regenerateDay, removeItem, mealsMap } = useMealState();
     const { activeTarget } = useNutritionTargets();
     const { stats: userData } = useUserStats();
+    const adminSettings = useAdminSettings();
     const router = useRouter();
 
     const handleReplace = (newFood: FoodItem) => {
@@ -243,6 +245,7 @@ export const MealCard = ({ meal, dateKey }: MealCardProps) => {
                     targetCalories={activeTarget?.calories || 2000}
                     currentCalories={meal.totalCalories} 
                     userData={userData}
+                    enableRebalance={adminSettings?.enable_rebalance !== false}
                 />
             )}
 

@@ -1,13 +1,23 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2 } from "lucide-react";
 
 export default function StartPage() {
     const router = useRouter();
+    const [mounted, setMounted] = useState(false);
 
-    return (
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) return (
+        <div className="flex items-center justify-center min-h-[400px]">
+             <Loader2 className="animate-spin text-emerald-500" size={32} />
+        </div>
+    );
         <div className="flex flex-col items-center text-center space-y-8">
             <motion.div 
                 initial={{ rotate: -10, scale: 0.8 }}

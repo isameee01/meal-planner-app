@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMounted } from "../../lib/hooks/useMounted";
+import { useUserProfile } from "../../hooks/useUserProfile";
+import { useAuth } from "../../hooks/useAuth";
 import CalendarModal from "./CalendarModal";
 
 interface HeaderProps {
@@ -46,21 +48,14 @@ export default function Header({
 }: HeaderProps) {
     const mounted = useMounted();
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-    const [user, setUser] = useState<{ fullName: string } | null>(null);
-
-    useEffect(() => {
-        if (!mounted) return;
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
-    }, [mounted]);
+    const { profile } = useUserProfile();
+    const { logout } = useAuth();
 
     if (!mounted) return null;
 
 
-    const handleLogout = () => {
-        localStorage.clear();
+    const handleLogout = async () => {
+        await logout();
         window.location.href = "/";
     };
 
@@ -232,7 +227,7 @@ export default function Header({
                 <div className="h-8 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block mx-1"></div>
 
                 <AnimatePresence mode="wait">
-                    {mounted && user ? (
+                    {mounted && profile ? (
                         <motion.div 
                             key="user"
                             initial={{ opacity: 0, x: 10 }}
@@ -240,7 +235,7 @@ export default function Header({
                             className="hidden sm:flex flex-col items-end mr-1"
                         >
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Performance Hub</span>
-                            <span className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">{user.fullName}</span>
+                            <span className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">{profile.fullName || "Elite User"}</span>
                         </motion.div>
                     ) : (
                         <div className="hidden sm:flex flex-col items-end mr-1">

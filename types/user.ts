@@ -4,6 +4,8 @@ export type BodyFatLevel = "low" | "medium" | "high";
 
 export type Sex = "male" | "female" | "non-binary";
 
+export type DietType = "anything" | "keto" | "mediterranean" | "paleo" | "vegan" | "vegetarian";
+
 export interface UserPhysicalStats {
     name: string;
     profileImage?: string;
@@ -29,4 +31,25 @@ export interface UserGoal {
     targetWeightKg?: number;
     weeklyChangeKg?: number;
     needsRecalculation: boolean;
+}
+
+export interface UserProfile {
+    id: string; // auth.uid()
+    fullName: string;
+    weightKg: number;
+    heightCm: number;
+    age: number;
+    sex: Sex;
+    activityLevel: ActivityLevelId;
+    goalType: GoalType;
+    goalMode: GoalMode;
+    targetWeightKg?: number;
+    weeklyChangeKg?: number;
+    dietType: DietType;
+    calorieTarget: number;
+    proteinTarget: number;
+    carbsTarget: number;
+    fatsTarget: number;
+    role: "admin" | "user";
+    updatedAt: string;
 }

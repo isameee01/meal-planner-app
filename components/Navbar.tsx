@@ -4,28 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { User, LogOut, Layout } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Navbar() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [userName, setUserName] = useState("");
+    const { user, logout, loading } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        const storedUser = localStorage.getItem("user");
-        const status = localStorage.getItem("isLoggedIn");
-        
-        if (storedUser && status === "true") {
-            try {
-                const user = JSON.parse(storedUser);
-                setIsLoggedIn(true);
-                setUserName(user.fullName || "User");
-            } catch (e) {
-                console.error("Auth sync error", e);
-            }
-        }
-
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 20);
         };
@@ -33,12 +20,16 @@ export default function Navbar() {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem("isLoggedIn");
-        localStorage.removeItem("user");
-        localStorage.removeItem("mealPlan");
-        window.location.href = "/";
+    const handleLogout = async () => {
+        try {
+            await logout();
+            window.location.href = "/";
+        } catch (e) {
+            console.error("Logout error", e);
+        }
     };
+
+    const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User";
 
     return (
         <nav className={`fixed top-0 z-50 w-full transition-all duration-300 ${
@@ -63,7 +54,7 @@ export default function Navbar() {
 
                     <div className="flex items-center space-x-6">
                         <AnimatePresence mode="wait">
-                            {!isLoggedIn || !mounted ? (
+                            {(!user && !loading && mounted) ? (
                                 <motion.div 
                                     key="logged-out"
                                     initial={{ opacity: 0, x: 10 }}
@@ -81,7 +72,7 @@ export default function Navbar() {
                                         Sign Up
                                     </Link>
                                 </motion.div>
-                            ) : (
+                            ) : (user && mounted) ? (
                                 <motion.div 
                                     key="logged-in"
                                     initial={{ opacity: 0, scale: 0.9 }}
@@ -91,13 +82,13 @@ export default function Navbar() {
                                 >
                                     <div className="hidden sm:flex flex-col items-end mr-2">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Welcome back</span>
-                                        <span className="text-sm font-black text-slate-800 leading-none">{userName}</span>
+                                        <span className="text-sm font-black text-slate-800 leading-none truncate max-w-[150px]">{userName}</span>
                                     </div>
                                     
-                                    <div className="flex items-center space-x-2 bg-slate-100 p-1.5 rounded-2xl">
+                                    <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl">
                                         <Link 
                                             href="/dashboard"
-                                            className="p-2 bg-white text-emerald-600 rounded-xl shadow-sm hover:bg-emerald-50 transition-colors"
+                                            className="p-2 bg-white dark:bg-slate-700 text-emerald-600 rounded-xl shadow-sm hover:bg-emerald-50 dark:hover:bg-slate-600 transition-colors"
                                             title="Go to Dashboard"
                                         >
                                             <Layout size={18} />
@@ -111,7 +102,7 @@ export default function Navbar() {
                                         </button>
                                     </div>
                                 </motion.div>
-                            )}
+                            ) : null}
                         </AnimatePresence>
                     </div>
                 </div>

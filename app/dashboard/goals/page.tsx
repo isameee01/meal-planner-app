@@ -19,9 +19,7 @@ import {
     ChevronDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUserStats } from "../../../lib/hooks/useUserStats";
-import { useUserGoal } from "../../../lib/hooks/useUserGoal";
-import { useNutritionTargets, generateTargetFromProfile } from "../../../lib/hooks/useNutritionTargets";
+import { useUserProfile } from "../../../hooks/useUserProfile";
 import { GoalType, GoalMode } from "../../../types/user";
 import { calculateBMR, calculateTDEE } from "../../../lib/nutrition";
 import { WeightDisplay } from "../../../components/dashboard/WeightDisplay";
@@ -30,21 +28,39 @@ import { useGeneratorSettings } from "../../../lib/hooks/useGeneratorSettings";
 
 export default function WeightGoalPage() {
     const { 
-        stats, 
-        updateStats, 
-        status: statsStatus, 
-        isLoaded: statsLoaded 
-    } = useUserStats();
-    
-    const { 
-        goal, 
-        updateGoal, 
-        markRecalculated, 
-        status: goalStatus, 
-        isLoaded: goalLoaded 
-    } = useUserGoal();
+        profile,
+        updateProfile,
+        loading,
+        error: profileError
+    } = useUserProfile();
 
-    const { addTarget } = useNutritionTargets();
+    // Map profile to legacy structures for UI compatibility
+    const stats = profile ? {
+        weight: profile.weightKg,
+        heightCm: profile.heightCm,
+        age: profile.age,
+        sex: profile.sex,
+        activityLevel: profile.activityLevel,
+        height: { ft: Math.floor(profile.heightCm / 30.48), in: Math.round((profile.heightCm % 30.48) / 2.54) }
+    } : null;
+
+    const goal = profile ? {
+        goalMode: profile.goalMode,
+        goalType: profile.goalType,
+        targetWeightKg: profile.targetWeightKg,
+        weeklyChangeKg: profile.weeklyChangeKg,
+        needsRecalculation: false // Always false because we sync immediately
+    } : null;
+
+    const statsLoaded = !loading && !!profile;
+    const goalLoaded = !loading && !!profile;
+
+    const updateStats = (updates: any) => updateProfile({ weightKg: updates.weight });
+    const updateGoal = (updates: any) => updateProfile(updates);
+    const markRecalculated = () => {};
+    const addTarget = () => {};
+    const statsStatus = loading ? "saving" : "idle"; // Rough mapping
+    const goalStatus = loading ? "saving" : "idle";
 
     const [weightInput, setWeightInput] = useState("");
     const [targetWeightInput, setTargetWeightInput] = useState("");

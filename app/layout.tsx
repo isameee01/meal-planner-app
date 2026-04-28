@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/theme/ThemeProvider";
+import { AuthProvider } from "@/lib/contexts/AuthContext";
 
 export const metadata: Metadata = {
     title: "CustomDailyDiet - Autopilot your diet",
@@ -15,9 +16,11 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className="antialiased">
-                <ThemeProvider>
-                    {children}
-                </ThemeProvider>
+                <AuthProvider>
+                    <ThemeProvider>
+                        {children}
+                    </ThemeProvider>
+                </AuthProvider>
             </body>
         </html>
     );

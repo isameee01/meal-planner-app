@@ -27,12 +27,13 @@ import { useNutritionTargets } from "../../lib/hooks/useNutritionTargets";
 import { useGlobalFoodState } from "../../lib/contexts/FoodStateContext";
 import { FOOD_DATABASE } from "../../lib/food-db";
 import { useGeneratorSettings } from "../../lib/hooks/useGeneratorSettings";
+import { useAdminSettings } from "../../hooks/useAdminSettings";
 import DropdownMenu from "./DropdownMenu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { MealCard } from "./MealCard";
 import { useMealState } from "../../lib/contexts/MealStateContext";
-import { useUserStats } from "../../lib/hooks/useUserStats";
+import { useUserProfile } from "../../hooks/useUserProfile";
 import { repairSystemData } from "../../lib/utils/initializeSystem";
 
 interface MealSectionProps {
@@ -68,11 +69,12 @@ export default function MealSection({
     isProcessing 
 }: MealSectionProps) {
     const { mealsMap, regenerateDay, batchRegenerateDays, refreshMeals, loading: isStateLoading } = useMealState();
-    const { stats: userStats, isLoaded: isStatsLoaded } = useUserStats();
+    const { profile: userProfile, loading: isProfileLoading } = useUserProfile();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isAILoading, setIsAILoading] = useState(false);
     const [isSynthesizing, setIsSynthesizing] = useState(false);
     const { settings } = useGeneratorSettings();
+    const adminSettings = useAdminSettings();
     const { activeTarget } = useNutritionTargets();
     const { blockedFoods } = useGlobalFoodState();
 
@@ -97,16 +99,21 @@ export default function MealSection({
     }, [viewMode, selectedDate, dateRange]);
 
     const loadMeals = useCallback(async () => {
-        if (!isStatsLoaded) return;
+        if (isAILoading || isSynthesizing) return;
         
-        setErrorMessage(null);
         setIsProcessing(true);
+        setIsSynthesizing(true);
+        setErrorMessage(null); // Clear previous errors
 
         try {
-            const { profile, needsSetup } = repairSystemData();
-            if (needsSetup) {
-                setErrorMessage("Configuration incomplete. Please complete profile setup.");
+            // Check Profile
+            if (!userProfile) return;
+
+            // Check if AI is disabled by admin
+            if (adminSettings && adminSettings.enable_meal_generation === false) {
+                setErrorMessage("Meal generation is currently disabled by administrator.");
                 setIsProcessing(false);
+                setIsSynthesizing(false);
                 return;
             }
 
@@ -117,23 +124,30 @@ export default function MealSection({
 
             if (missingDates.length === 0) {
                 setIsProcessing(false);
+                setIsSynthesizing(false);
                 return;
             }
 
-            console.log("[MealSection] Generating meals for missing dates:", missingDates);
-
-            // TRIGGER AI GENERATION FOR ALL MISSING DATES IN ONE CALL
             setIsAILoading(true);
-            setIsSynthesizing(true);
-
-            const statsStr = localStorage.getItem("user_stats");
-            const userData = statsStr ? JSON.parse(statsStr) : { weight: 70, goalType: "maintain" };
+            const userData = {
+                age: userProfile.age,
+                weight: userProfile.weightKg,
+                height: userProfile.heightCm,
+                goalType: userProfile.goalType,
+                activityLevel: userProfile.activityLevel,
+                dietType: userProfile.dietType,
+                calorieTarget: userProfile.calorieTarget,
+                proteinTarget: userProfile.proteinTarget,
+                carbsTarget: userProfile.carbsTarget,
+                fatsTarget: userProfile.fatsTarget
+            };
 
             try {
                 // Single AI call for ALL missing dates
+                const combinedSettings = adminSettings || settings;
                 const aiPlansMap = await generateMultiDayMealPlanAI(
                     userData,
-                    settings,
+                    combinedSettings,
                     missingDates,
                     blockedFoods
                 );
@@ -161,7 +175,7 @@ export default function MealSection({
 
                 const fallbackMap: Record<string, GeneratedMeal[]> = {};
                 for (const dateStr of missingDates) {
-                    fallbackMap[dateStr] = generateMealPlan(profile, preferences);
+                    fallbackMap[dateStr] = generateMealPlan(userProfile, preferences);
                 }
                 batchRegenerateDays(fallbackMap);
                 setErrorMessage("AI is currently busy. High-quality local plans have been prepared.");
@@ -175,30 +189,30 @@ export default function MealSection({
             setIsSynthesizing(false);
             setIsProcessing(false);
         }
-    }, [targetDates, settings, getDateKey, isStatsLoaded, regenerateDay, batchRegenerateDays, mealsMap, blockedFoods]);
+    }, [targetDates, settings, getDateKey, userProfile, batchRegenerateDays, mealsMap, blockedFoods, adminSettings, setIsProcessing, isAILoading, isSynthesizing]);
 
     useEffect(() => {
-        if (!isStateLoading && isStatsLoaded && userStats && !isAILoading) {
+        if (!isStateLoading && !isProfileLoading && userProfile && !isAILoading) {
             // Check if any of the target dates are missing meals
             const anyMissing = targetDates.some(d => !mealsMap[getDateKey(d)]);
             if (anyMissing) {
                 loadMeals();
             }
         }
-    }, [loadMeals, isStateLoading, isStatsLoaded, userStats, targetDates, getDateKey, mealsMap, isAILoading]);
+    }, [loadMeals, isStateLoading, isProfileLoading, userProfile, targetDates, getDateKey, mealsMap, isAILoading]);
 
     const handleRegenerate = () => {
+        if (adminSettings?.enable_meal_generation === false) return;
+        
         if (window.confirm("Regenerate all meals for this period?")) {
             targetDates.forEach(date => {
                 const dateKey = getDateKey(date);
-                localStorage.removeItem(`meals_cache_${dateKey}`); // Ensure fresh generation if using separate keys
+                localStorage.removeItem(`meals_cache_${dateKey}`);
             });
             localStorage.removeItem("meals_cache");
             refreshMeals();
         }
     };
-
-    // AI generation logic is now handled in the auto-load effect for zero-click interaction
 
     const dailyTotals = useMemo(() => {
         const dateKey = getDateKey(selectedDate);
@@ -219,69 +233,51 @@ export default function MealSection({
         doc.setFontSize(22);
         doc.setTextColor(16, 185, 129);
         doc.text("CustomDailyDiet", 14, 25);
-        // ... (PDF logic truncated for brevity, but kept in full file)
+        // ... (PDF logic)
         doc.save(`meal-plan-${getDateKey(selectedDate)}.pdf`);
     }, [selectedDate, getDateKey]);
 
     const shareItems = [
         { label: "Download PDF Plan", onClick: handleGeneratePDF, icon: <Download size={16} /> },
-        { label: "Share via WhatsApp", onClick: () => alert("WhatsApp share initiated... (Ready for production API)"), icon: <Phone size={16} /> },
-        { label: "Send via Email", onClick: () => alert("Email share initiated... (Ready for production SMTP)"), icon: <Mail size={16} /> },
-        { label: "Regenerate Plan", onClick: handleRegenerate, icon: <RefreshCcw size={16} />, variant: "danger" as const },
+        { label: "Share via WhatsApp", onClick: () => alert("WhatsApp share initiated..."), icon: <Phone size={16} /> },
+        { label: "Send via Email", onClick: () => alert("Email share initiated..."), icon: <Mail size={16} /> },
+        { label: "Regenerate Plan", onClick: handleRegenerate, icon: <RefreshCcw size={16} />, variant: "danger" as const, disabled: adminSettings?.enable_meal_generation === false },
     ];
 
     return (
-        <div className="space-y-8 relative">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                     <motion.h2 
-                        initial={{ x: -10, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        className="text-3xl font-black text-slate-800 dark:text-slate-100 italic uppercase flex items-center tracking-tight"
-                    >
-                        Meal Performance <Zap size={28} className="ml-3 text-emerald-500 fill-emerald-500 shadow-xl" />
-                    </motion.h2>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.3em] mt-2 flex items-center">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                        {viewMode === "day" ? "24H Precision Fueling" : "Weekly Strategic Roadmap"}
-                    </p>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2 px-6 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-full border border-emerald-100 dark:border-emerald-900/50">
-                        <Sparkles size={14} className="text-emerald-500" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">AI Engine Active</span>
-                    </div>
-                    <DropdownMenu items={shareItems} />
-                </div>
-            </div>
-
-            {viewMode === "day" && (
-                <div className="sticky top-4 z-40 py-4 pointer-events-none">
-                    <motion.div 
-                        initial={{ y: -20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800 shadow-2xl rounded-[24px] p-1.5 flex items-center justify-between pointer-events-auto"
-                    >
-                        <div className="flex items-center space-x-2 px-4 py-2 bg-slate-900 dark:bg-white rounded-2xl text-white dark:text-slate-900">
-                             <Flame size={16} className="fill-current" />
-                             <span className="text-xs font-black uppercase">{dailyTotals.calories}</span>
-                             <span className="text-[10px] font-bold opacity-60 uppercase mx-1">kcal</span>
-                        </div>
-                        
-                        <div className="hidden md:flex items-center space-x-6 px-4">
-                            <SummaryMacro label="Protein" value={dailyTotals.protein} color="bg-blue-500" />
-                            <SummaryMacro label="Carbs" value={dailyTotals.carbs} color="bg-amber-500" />
+        <div className="space-y-12">
+            {!isAILoading && !isSynthesizing && mealsMap[getDateKey(selectedDate)] && (
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
+                    <div className="flex items-center space-x-6">
+                        <div className="flex -space-x-3">
+                            <SummaryMacro label="Cals" value={dailyTotals.calories} color="bg-emerald-500" />
+                            <SummaryMacro label="Prot" value={dailyTotals.protein} color="bg-blue-500" />
+                            <SummaryMacro label="Carb" value={dailyTotals.carbs} color="bg-amber-500" />
                             <SummaryMacro label="Fat" value={dailyTotals.fat} color="bg-rose-500" />
                         </div>
 
                         <button 
                             onClick={handleRegenerate}
-                            className="w-11 h-11 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-emerald-500 rounded-2xl flex items-center justify-center transition-colors"
+                            disabled={adminSettings?.enable_meal_generation === false}
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+                                adminSettings?.enable_meal_generation === false 
+                                    ? "bg-slate-50 dark:bg-slate-800 text-slate-200 cursor-not-allowed opacity-50" 
+                                    : "bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50"
+                            }`}
+                            title={adminSettings?.enable_meal_generation === false ? "Generation Disabled by Admin" : "Regenerate Plan"}
                         >
                             <RefreshCcw size={18} />
                         </button>
-                    </motion.div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                        <DropdownMenu items={shareItems}>
+                            <button className="h-12 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-200/50 dark:shadow-none">
+                                <Share2 size={16} />
+                                Share Plan
+                            </button>
+                        </DropdownMenu>
+                    </div>
                 </div>
             )}
 
@@ -295,13 +291,15 @@ export default function MealSection({
                         className="p-8 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/40 rounded-[32px] flex flex-col items-center text-center space-y-4"
                     >
                         <AlertCircle size={32} className="text-red-500" />
-                        <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 italic uppercase tracking-tighter">System Error</h4>
+                        <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 italic uppercase tracking-tighter">System Alert</h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-bold max-w-xs">{errorMessage}</p>
-                        <button onClick={loadMeals} className="bg-slate-800 dark:bg-slate-700 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Retry Sync</button>
+                        {adminSettings?.enable_meal_generation !== false && (
+                            <button onClick={loadMeals} className="bg-slate-800 dark:bg-slate-700 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Retry Sync</button>
+                        )}
                     </motion.div>
                 )}
 
-                {!errorMessage && targetDates.map((date, idx) => {
+                {targetDates.map((date, idx) => {
                     const dateKey = getDateKey(date);
                     const dayMeals = mealsMap[dateKey];
 
@@ -321,79 +319,54 @@ export default function MealSection({
                                 </div>
                             </div>
 
+                            <div className="grid grid-cols-1 gap-6">
+                                {dayMeals && dayMeals.length > 0 ? (
+                                    dayMeals.map((meal) => (
+                                        <MealCard key={`${dateKey}-${meal.slot}`} meal={meal} dateKey={dateKey} />
+                                    ))
+                                ) : (
+                                    <div className="h-48 bg-slate-50 dark:bg-slate-800/40 rounded-[32px] border-2 border-dashed border-slate-100 dark:border-slate-800 flex flex-center">
+                                       {!isAILoading && !isSynthesizing && <p className="text-xs font-black uppercase text-slate-300 tracking-widest">Awaiting Plan Intel...</p>}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </AnimatePresence>
+
             <AnimatePresence>
                 {isAILoading && (
                     <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-white/60 dark:bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center"
+                        className="fixed inset-0 z-[100] bg-white/60 dark:bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
                     >
-                        <div className="relative">
-                            <motion.div 
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                                className="w-24 h-24 border-2 border-dashed border-emerald-500/30 rounded-full"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <Sparkles size={32} className="text-emerald-500 fill-emerald-500 animate-pulse" />
-                            </div>
+                        <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-[40px] shadow-2xl flex items-center justify-center mb-8 relative">
+                             <div className="absolute inset-0 rounded-[40px] bg-emerald-500 animate-ping opacity-20" />
+                             <Sparkles className="text-emerald-500 relative z-10" size={40} />
                         </div>
-                        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-[0.3em] mt-8 italic">AI is preparing your personalized nutrition plan...</h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2 animate-pulse">Calculating optimal calories & macro distribution...</p>
+                        <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-widest uppercase italic mb-2">Synthesizing</h2>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-12">Llama 3.3 70B Engine · Personalizing Targets</p>
+                        <div className="w-64 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
+                             <motion.div 
+                                className="h-full bg-emerald-500"
+                                initial={{ width: 0 }}
+                                animate={{ width: "100%" }}
+                                transition={{ duration: 15, repeat: Infinity }}
+                             />
+                        </div>
                     </motion.div>
                 )}
-
-                {isProcessing && !isAILoading && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-white/60 dark:bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center"
-                    >
-                        <div className="relative">
-                            <motion.div 
-                                animate={{ rotate: -360 }}
-                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                className="w-20 h-20 border-2 border-dashed border-emerald-500/30 rounded-full"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <Zap size={28} className="text-emerald-500 fill-emerald-500 animate-pulse" />
-                            </div>
-                        </div>
-                        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-[0.3em] mt-8 italic">AI is adjusting your meals...</h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2 animate-pulse">Rebalancing remaining budget for consistency...</p>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <AnimatePresence mode="wait">
-                                {dayMeals ? (
-                                    <div key="meals-loaded" className="space-y-6">
-                                        {dayMeals.map((meal) => (
-                                            <MealCard key={`${dateKey}-${meal.slot}`} meal={meal} dateKey={dateKey} />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div key="meals-loading" className="space-y-4">
-                                        {[1, 2, 3, 4].map(s => (
-                                            <div key={s} className="h-40 bg-slate-50/50 dark:bg-slate-900/50 rounded-[32px] border border-dashed border-slate-200 dark:border-slate-800 animate-pulse" />
-                                        ))}
-                                    </div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    );
-                })}
             </AnimatePresence>
         </div>
     );
 }
 
 const SummaryMacro = ({ label, value, color }: { label: string, value: number, color: string }) => (
-    <div className="flex items-center space-x-2">
-        <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
-        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{label}</span>
-        <span className="text-sm font-black text-slate-800 dark:text-slate-100">{value}g</span>
+    <div className={`px-4 py-2 ${color} rounded-2xl flex flex-col items-center justify-center min-w-[70px] shadow-lg shadow-current/20 border-2 border-white/20`}>
+        <span className="text-[7px] font-black text-white/60 uppercase tracking-widest leading-none mb-1">{label}</span>
+        <span className="text-xs font-black text-white">{Math.round(value)}</span>
     </div>
 );

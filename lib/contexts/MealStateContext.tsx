@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { GeneratedMeal } from "../meal-planner";
 import { scaleMealServings } from "../ai/generateMealPlan";
+import { useAdminSettings } from "../../hooks/useAdminSettings";
 
 interface MealStateContextType {
     mealsMap: Record<string, GeneratedMeal[]>;
@@ -22,6 +23,7 @@ const MealStateContext = createContext<MealStateContextType | undefined>(undefin
 export function MealStateProvider({ children }: { children: React.ReactNode }) {
     const [mealsMap, setMealsMap] = useState<Record<string, GeneratedMeal[]>>({});
     const [loading, setLoading] = useState(true);
+    const adminSettings = useAdminSettings();
 
     const loadMeals = useCallback(() => {
         const cacheRaw = localStorage.getItem("meals_cache");
@@ -127,21 +129,77 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
-    const regenerateDay = useCallback((dateKey: string, newMeals: GeneratedMeal[]) => {
+    const regenerateDay = useCallback(async (dateKey: string, newMeals: GeneratedMeal[]) => {
+        // Mark all new foods as generating
+        const foodsToGen = newMeals.flatMap(m => m.items).filter(i => !i.food.recipe).map(i => i.food);
+        
         setMealsMap(prev => {
-            const nextMap = { ...prev, [dateKey]: newMeals };
+            const dayMeals = newMeals.map(meal => ({
+                ...meal,
+                items: meal.items.map(item => ({
+                    ...item,
+                    food: { ...item.food, isGeneratingRecipe: !item.food.recipe }
+                }))
+            }));
+            const nextMap = { ...prev, [dateKey]: dayMeals };
             localStorage.setItem("meals_cache", JSON.stringify(nextMap));
             return nextMap;
         });
-    }, []);
 
-    const batchRegenerateDays = useCallback((records: Record<string, GeneratedMeal[]>) => {
+        // Trigger recipes
+        if (foodsToGen.length > 0 && adminSettings?.enable_recipe_generation !== false) {
+            const { generateRecipesForFoods } = await import("../ai/generateRecipe");
+            const recipes = await generateRecipesForFoods(foodsToGen, "maintain", adminSettings);
+            
+            setMealsMap(prev => {
+                const dayMeals = prev[dateKey]?.map(meal => ({
+                    ...meal,
+                    items: meal.items.map(item => {
+                        const recipe = recipes[item.food.id];
+                        if (!recipe) return item;
+                        return { ...item, food: { ...item.food, recipe, isGeneratingRecipe: false } };
+                    })
+                }));
+                const nextMap = { ...prev, [dateKey]: dayMeals || [] };
+                localStorage.setItem("meals_cache", JSON.stringify(nextMap));
+                return nextMap;
+            });
+        }
+    }, [adminSettings]);
+
+    const batchRegenerateDays = useCallback(async (records: Record<string, GeneratedMeal[]>) => {
+        // Simple set first
         setMealsMap(prev => {
             const nextMap = { ...prev, ...records };
             localStorage.setItem("meals_cache", JSON.stringify(nextMap));
             return nextMap;
         });
-    }, []);
+
+        // Trigger recipes for all new foods without recipes
+        const allNewFoods = Object.values(records).flatMap(day => day.flatMap(m => m.items)).map(i => i.food);
+        const foodsToGen = allNewFoods.filter(f => !f.recipe);
+
+        if (foodsToGen.length > 0 && adminSettings?.enable_recipe_generation !== false) {
+            const { generateRecipesForFoods } = await import("../ai/generateRecipe");
+            const recipes = await generateRecipesForFoods(foodsToGen, "maintain", adminSettings);
+            
+            setMealsMap(prev => {
+                const nextMap = { ...prev };
+                Object.keys(records).forEach(date => {
+                    nextMap[date] = nextMap[date].map(meal => ({
+                        ...meal,
+                        items: meal.items.map(item => {
+                            const recipe = recipes[item.food.id];
+                            if (!recipe) return item;
+                            return { ...item, food: { ...item.food, recipe, isGeneratingRecipe: false } };
+                        })
+                    }));
+                });
+                localStorage.setItem("meals_cache", JSON.stringify(nextMap));
+                return nextMap;
+            });
+        }
+    }, [adminSettings]);
 
     const removeItem = useCallback((dateKey: string, slot: string, foodId: string) => {
         setMealsMap(prev => {
@@ -246,22 +304,22 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
 
         // 2. Trigger AI recipe generation if not already cached
         if (!food.recipe) {
-            try {
-                const { generateRecipeForFood } = await import("../ai/generateRecipe");
-                // Get userData from context/stats (we'll need to fetch it or pass it)
-                // For simplicity, we assume userData is available or passed. 
-                // Currently userStats hook is separate, we'll try to get it inside the caller if needed
-                // but here we can just use a default or fetch from localStorage
-                const recipe = await generateRecipeForFood(food);
-                updateFoodRecipe(food.id, recipe);
-            } catch (e) {
-                console.error("[MealState] Recipe generation failed for add:", e);
-                setFoodsGenerating([food.id], false);
+            if (adminSettings && adminSettings.enable_recipe_generation === false) {
+                 setFoodsGenerating([food.id], false);
+            } else {
+                try {
+                    const { generateRecipeForFood } = await import("../ai/generateRecipe");
+                    const recipe = await generateRecipeForFood(food, "maintain", adminSettings);
+                    updateFoodRecipe(food.id, recipe);
+                } catch (e) {
+                    console.error("[MealState] Recipe generation failed for add:", e);
+                    setFoodsGenerating([food.id], false);
+                }
             }
         } else {
             setFoodsGenerating([food.id], false);
         }
-    }, [buildMealsWithAddedItem, updateFoodRecipe, setFoodsGenerating]);
+    }, [buildMealsWithAddedItem, updateFoodRecipe, setFoodsGenerating, adminSettings]);
 
     // ── rebalanceDay: add food FIRST then call AI on updated state, then batch generate recipes ──
     const rebalanceDay = useCallback(async (
@@ -294,7 +352,8 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
                 addedItem,
                 slot,
                 userData,
-                targetCal
+                targetCal,
+                adminSettings
             );
 
             // Step 3: Identify all NEW foods that need recipes and mark them as generating
@@ -329,31 +388,50 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
                 .map(i => i.food);
 
             if (foodsToGen.length > 0) {
-                const { generateRecipesForFoods } = await import("../ai/generateRecipe");
-                const recipes = await generateRecipesForFoods(foodsToGen, userData?.goalType);
-                
-                // Final update: plug in all recipes at once
-                setMealsMap(prev => {
-                    const dayMeals = prev[dateKey];
-                    const finalizedMeals = dayMeals.map(meal => ({
-                        ...meal,
-                        items: meal.items.map(item => {
-                            const recipe = recipes[item.food.id];
-                            if (!recipe) return item;
-                            return {
+                if (adminSettings && adminSettings.enable_recipe_generation === false) {
+                    setMealsMap(prev => {
+                        const dayMeals = prev[dateKey];
+                        const finalizedMeals = dayMeals.map(meal => ({
+                            ...meal,
+                            items: meal.items.map(item => ({
                                 ...item,
                                 food: {
                                     ...item.food,
-                                    recipe,
                                     isGeneratingRecipe: false
                                 }
-                            };
-                        })
-                    }));
-                    const nextMap = { ...prev, [dateKey]: finalizedMeals };
-                    localStorage.setItem("meals_cache", JSON.stringify(nextMap));
-                    return nextMap;
-                });
+                            }))
+                        }));
+                        const nextMap = { ...prev, [dateKey]: finalizedMeals };
+                        localStorage.setItem("meals_cache", JSON.stringify(nextMap));
+                        return nextMap;
+                    });
+                } else {
+                    const { generateRecipesForFoods } = await import("../ai/generateRecipe");
+                    const recipes = await generateRecipesForFoods(foodsToGen, userData?.goalType, adminSettings);
+                    
+                    // Final update: plug in all recipes at once
+                    setMealsMap(prev => {
+                        const dayMeals = prev[dateKey];
+                        const finalizedMeals = dayMeals.map(meal => ({
+                            ...meal,
+                            items: meal.items.map(item => {
+                                const recipe = recipes[item.food.id];
+                                if (!recipe) return item;
+                                return {
+                                    ...item,
+                                    food: {
+                                        ...item.food,
+                                        recipe,
+                                        isGeneratingRecipe: false
+                                    }
+                                };
+                            })
+                        }));
+                        const nextMap = { ...prev, [dateKey]: finalizedMeals };
+                        localStorage.setItem("meals_cache", JSON.stringify(nextMap));
+                        return nextMap;
+                    });
+                }
             }
 
         } catch (error) {
@@ -361,7 +439,7 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [buildMealsWithAddedItem]);
+    }, [buildMealsWithAddedItem, adminSettings]);
 
     return (
         <MealStateContext.Provider value={{

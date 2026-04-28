@@ -14,9 +14,10 @@ export async function callGroqAPI(messages: GroqMessage[], options?: {
     maxTokens?: number;
     temperature?: number;
     timeoutMs?: number;
+    model?: string;
 }) {
     const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
-    const model = process.env.NEXT_PUBLIC_GROQ_MODEL || "llama-3.3-70b-versatile";
+    const model = options?.model || process.env.NEXT_PUBLIC_GROQ_MODEL || "llama-3.3-70b-versatile";
 
     if (!apiKey) {
         console.error("[Groq] NEXT_PUBLIC_GROQ_API_KEY is missing. AI features will fail.");

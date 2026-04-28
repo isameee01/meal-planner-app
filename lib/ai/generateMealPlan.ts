@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AI Meal Planner Engine - Production Grade
  * Generates and rebalances personalized meal plans using Groq (Llama 3.3 70B)
  *
@@ -127,25 +127,30 @@ function buildMultiDayPrompt(
 USER PROFILE:
 - Age: ${userData.age || 30}
 - Weight: ${userData.weight || 70}kg
-- Height: ${userData.height || 170}cm
 - Goal: ${userData.goalType || "maintain"}
 - Activity Level: ${userData.activityLevel || "moderate"}
+- Diet Type: ${userData.dietType || "anything"}
+
+STRICT NUTRITIONAL TARGETS (PER DAY):
+- Calories: ${userData.calorieTarget || 2000} kcal
+- Protein: ${userData.proteinTarget || 150}g
+- Carbs: ${userData.carbsTarget || 200}g
+- Fats: ${userData.fatsTarget || 60}g
 ${servingsNote}
 
 DATES TO GENERATE: ${dates.join(", ")}
 
 STRICT REQUIREMENTS:
-1. Generate ALL ${dates.length} days — no day can be empty or skipped.
+1. Generate ALL ${dates.length} days.
 2. Each day MUST have exactly 4 meals: breakfast, lunch, dinner, snack.
-3. Every meal MUST include:
-   - A realistic, specific recipe name (not generic like "Chicken Dish")
-   - At LEAST 4-8 DETAILED ingredients with PRECISE quantities AND individual macros
-   - At least 4 step-by-step cooking instructions
-   - Accurate nutrition totals (calories, protein, carbs, fats)
-4. Ingredients must be REAL food items with REALISTIC quantities.
-5. STRICTLY PROHIBITED foods: ${blockedFoodNames.length > 0 ? blockedFoodNames.join(", ") : "None"}
-6. Vary meals across days — no repeated recipes.
-7. Balance macros for the user's goal: ${userData.goalType || "maintain"}.
+3. Every meal MUST include realistic ingredients, precise quantities, and accurate macros.
+4. The TOTAL DAILY macros MUST match the targets above (+/- 5%). DO NOT DEVIATE.
+5. Diet Type logic: If "keto", use very low carb ingredients. If "vegan", NO animal products. If "vegetarian", NO meat/fish.
+6. STRICTLY PROHIBITED foods: ${blockedFoodNames.length > 0 ? blockedFoodNames.join(", ") : "None"}
+7. Vary meals across days — no repeated recipes.
+8. Focus on high-quality, whole food ingredients.
+9. Instructions must be clear and professional.
+10. RETURN ONLY VALID JSON.
 
 RETURN ONLY THIS EXACT JSON STRUCTURE (no explanation, no markdown):
 {
@@ -208,40 +213,65 @@ function transformAIDay(day: AIDay): GeneratedMeal[] {
         const safeIngredients = aiMeal.ingredients ?? [];
         const safeInstructions = aiMeal.instructions ?? [];
 
+        // ── Validation layer: Recalculate totals from ingredients to fix AI math hallucinations ──
+        let calcCals = 0;
+        let calcProtein = 0;
+        let calcCarbs = 0;
+        let calcFat = 0;
+
+        const validatedIngredients = safeIngredients.map(ing => {
+            const p = Math.max(0, ing.protein ?? 0);
+            const c = Math.max(0, ing.carbs ?? 0);
+            const f = Math.max(0, ing.fats ?? 0);
+            // If AI gave 0 calories but macros exist, fix it
+            const calculatedIngCals = (p * 4) + (c * 4) + (f * 9);
+            const finalIngCals = ing.calories > 0 ? ing.calories : calculatedIngCals;
+
+            calcProtein += p;
+            calcCarbs += c;
+            calcFat += f;
+            calcCals += finalIngCals;
+
+            return {
+                name: ing.name ?? "",
+                amount: ing.quantity ?? "",
+                calories: Math.round(finalIngCals),
+                protein: p,
+                carbs: c,
+                fats: f,
+            };
+        });
+
+        // Use AI's total if it's within 10% of calc, otherwise use calc
+        const aiTotalCals = aiMeal.calories ?? 0;
+        const finalMealCals = Math.abs(aiTotalCals - calcCals) / (calcCals || 1) < 0.1 ? aiTotalCals : calcCals;
+
         const virtualFood: FoodItem = {
             id: `ai-${slotKey}-${++aiGlobalIdCounter}`,
             name: aiMeal.name ?? `AI ${slotKey}`,
-            calories: Math.round(aiMeal.calories ?? 0),
-            protein: Math.round(aiMeal.protein ?? 0),
-            carbs: Math.round(aiMeal.carbs ?? 0),
-            fat: Math.round(aiMeal.fats ?? 0),
+            calories: Math.round(finalMealCals),
+            protein: Math.round(calcProtein),
+            carbs: Math.round(calcCarbs),
+            fat: Math.round(calcFat),
             fiber: 0,
             priceScore: 2,
             category: slotKey === "snack" ? "snack" : "protein",
             serving: `${aiMeal.servings ?? 1} serving(s)`,
             tags: ["ai-generated"],
             mealTypes: [slotKey],
-            // Rich recipe data from AI — always arrays, never undefined
-            ingredients: safeIngredients.map(ing => ({
-                name: ing.name ?? "",
-                amount: ing.quantity ?? "",
-                calories: ing.calories ?? 0,
-                protein: ing.protein ?? 0,
-                carbs: ing.carbs ?? 0,
-                fats: ing.fats ?? 0,
-            })),
+            ingredients: validatedIngredients,
             directions: safeInstructions,
             prepTime: aiMeal.prepTime ?? 15,
-            description: `AI-generated ${slotKey} for ${day.date}. Goal: ${aiMeal.calories ?? 0} kcal.`,
+            description: `AI-generated ${slotKey} for ${day.date}. Goal: ${finalMealCals} kcal.`,
         };
 
         return {
             slot: slotKey.charAt(0).toUpperCase() + slotKey.slice(1),
             items: [{ food: virtualFood, amount: aiMeal.servings ?? 1 }],
-            totalCalories: Math.round(aiMeal.calories ?? 0),
-            totalProtein: Math.round(aiMeal.protein ?? 0),
-            totalCarbs: Math.round(aiMeal.carbs ?? 0),
-            totalFat: Math.round(aiMeal.fats ?? 0),
+            totalCalories: Math.round(finalMealCals),
+            totalProtein: Math.round(calcProtein),
+            totalCarbs: Math.round(calcCarbs),
+            totalFat: Math.round(calcFat),
         } as GeneratedMeal;
     }).filter(Boolean) as GeneratedMeal[];
 }
@@ -374,14 +404,19 @@ export async function generateMultiDayMealPlanAI(
     const prompt = buildMultiDayPrompt(userData, dates, blockedFoodNames);
 
     try {
+        const systemPrompt = settings?.meal_prompt
+            ? `${settings.meal_prompt}\n\nYou ALWAYS return ONLY valid JSON matching the exact schema provided. No explanation, no markdown, no code blocks — just raw JSON.`
+            : "You are a professional AI Nutritionist. You ALWAYS return ONLY valid JSON matching the exact schema provided. No explanation, no markdown, no code blocks — just raw JSON.";
+
         const responseText = await callGroqAPI([
             {
                 role: "system",
-                content:
-                    "You are a professional AI Nutritionist. You ALWAYS return ONLY valid JSON matching the exact schema provided. No explanation, no markdown, no code blocks — just raw JSON.",
+                content: systemPrompt,
             },
             { role: "user", content: prompt },
-        ]);
+        ], {
+            model: settings?.ai_model || undefined
+        });
 
         console.log("[AI RAW RESPONSE]", responseText.substring(0, 500) + "...");
 
@@ -545,7 +580,8 @@ export async function rebalanceDayAI(
     addedItem: { name: string; calories: number; protein: number; carbs: number; fat: number },
     addedSlot: string,
     userData: any,
-    targetCalories: number
+    targetCalories: number,
+    settings?: any
 ): Promise<GeneratedMeal[]> {
     const slotsOrder = ["Breakfast", "Lunch", "Dinner", "Snack"];
     const addedIdx = slotsOrder.findIndex(s => s.toLowerCase() === addedSlot.toLowerCase());
@@ -633,13 +669,19 @@ export async function rebalanceDayAI(
     const prompt = promptLines.join("\n");
 
     try {
+        const systemPrompt = settings?.meal_prompt
+            ? `${settings.meal_prompt}\n\nYou are a precise AI nutritionist. Return ONLY valid JSON with real food data. No markdown, no code blocks, no explanation.`
+            : "You are a precise AI nutritionist. Return ONLY valid JSON with real food data. No markdown, no code blocks, no explanation.";
+
         const responseText = await callGroqAPI([
             {
                 role: "system",
-                content: "You are a precise AI nutritionist. Return ONLY valid JSON with real food data. No markdown, no code blocks, no explanation.",
+                content: systemPrompt,
             },
             { role: "user", content: prompt },
-        ]);
+        ], {
+            model: settings?.ai_model || undefined
+        });
 
         console.log("[AI REBALANCE RAW RESPONSE]", responseText.substring(0, 500));
 

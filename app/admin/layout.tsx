@@ -1,10 +1,15 @@
 import React from "react";
 import AdminLayoutClient from "@/components/admin/AdminLayoutClient";
+import { AdminRoute } from "@/components/auth/AdminRoute";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminLayoutClient>{children}</AdminLayoutClient>;
+  return (
+      <AdminRoute>
+          <AdminLayoutClient>{children}</AdminLayoutClient>
+      </AdminRoute>
+  );
 }

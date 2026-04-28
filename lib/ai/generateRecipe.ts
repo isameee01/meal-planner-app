@@ -31,7 +31,8 @@ export interface RecipeIngredient {
  */
 export async function generateRecipeForFood(
     food: { name: string; calories: number; protein: number; carbs: number; fat: number; serving?: string },
-    userGoal: string = "maintain"
+    userGoal: string = "maintain",
+    settings?: any
 ): Promise<FoodRecipe> {
     const prompt = [
         "You are an expert chef and nutritionist. Generate a complete, realistic recipe for this food item.",
@@ -52,13 +53,19 @@ export async function generateRecipeForFood(
     ].join("\n");
 
     try {
+        const systemPrompt = settings?.recipe_prompt
+            ? `${settings.recipe_prompt}\n\nYou are a precise chef. Return ONLY valid JSON matching the exact schema. No markdown, no code blocks, no explanation.`
+            : "You are a precise chef. Return ONLY valid JSON matching the exact schema. No markdown, no code blocks, no explanation.";
+
         const rawText = await callGroqAPI([
             {
                 role: "system",
-                content: "You are a precise chef. Return ONLY valid JSON matching the exact schema. No markdown, no code blocks, no explanation.",
+                content: systemPrompt,
             },
             { role: "user", content: prompt },
-        ]);
+        ], {
+            model: settings?.ai_model || undefined
+        });
 
         // Strip markdown fences if model wrapped the response
         let jsonText = rawText.trim();
@@ -118,10 +125,11 @@ export async function generateRecipeForFood(
  */
 export async function generateRecipesForFoods(
     foods: Array<{ id: string; name: string; calories: number; protein: number; carbs: number; fat: number; serving?: string }>,
-    userGoal: string = "maintain"
+    userGoal: string = "maintain",
+    settings?: any
 ): Promise<Record<string, FoodRecipe>> {
     const results = await Promise.all(
-        foods.map(food => generateRecipeForFood(food, userGoal))
+        foods.map(food => generateRecipeForFood(food, userGoal, settings))
     );
 
     const map: Record<string, FoodRecipe> = {};

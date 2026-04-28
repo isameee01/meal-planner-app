@@ -13,9 +13,10 @@ interface AddItemModalProps {
     targetCalories: number;
     currentCalories: number;
     userData: any;
+    enableRebalance?: boolean;
 }
 
-export const AddItemModal = ({ isOpen, onClose, onAdd, slot, targetCalories, currentCalories }: AddItemModalProps) => {
+export const AddItemModal = ({ isOpen, onClose, onAdd, slot, targetCalories, currentCalories, enableRebalance = true }: AddItemModalProps) => {
     const [search, setSearch] = useState("");
     const [selectedFood, setSelectedFood] = useState<any>(null);
 
@@ -124,10 +125,11 @@ export const AddItemModal = ({ isOpen, onClose, onAdd, slot, targetCalories, cur
                                         </button>
                                         <button 
                                             onClick={() => onAdd(selectedFood, true)}
-                                            className="py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all"
+                                            disabled={!enableRebalance}
+                                            className="py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                                         >
                                             <Zap size={14} className="fill-white" />
-                                            Add & Rebalance
+                                            {enableRebalance ? "Add & Rebalance" : "Rebalance Disabled"}
                                         </button>
                                     </div>
                                 </div>

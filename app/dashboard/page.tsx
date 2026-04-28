@@ -8,9 +8,9 @@ import NutritionChart from "../../components/dashboard/NutritionChart";
 import SavedFoodsPanel from "../../components/dashboard/SavedFoodsPanel";
 import OnboardingModal from "./OnboardingModal";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2 } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useMounted } from "../../lib/hooks/useMounted";
+import { useAuth } from "../../hooks/useAuth";
 import ClientOnly from "../../components/common/ClientOnly";
 import DataReady from "../../components/common/DataReady";
 import { SectionSkeleton, StatsSkeleton } from "../../components/common/Skeleton";
@@ -26,11 +26,8 @@ type SelectedDateState = {
 
 export default function DashboardPage() {
     const mounted = useMounted();
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const { user, loading: authLoading } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState<{ fullName: string; email: string } | null>(null);
-    const [collapsed, setCollapsed] = useState(false);
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [showWelcome, setShowWelcome] = useState(false);
     
     // --- Dashboard State ---
@@ -43,8 +40,8 @@ export default function DashboardPage() {
 
 
     useEffect(() => {
-        const storedUser = localStorage.getItem("user");
-        const authStatus = localStorage.getItem("isLoggedIn");
+        if (!mounted || authLoading) return;
+
         const onboardingComplete = localStorage.getItem("onboardingComplete");
         
         // Restore Dashboard State
@@ -65,16 +62,7 @@ export default function DashboardPage() {
                             end: new Date(parsed.week.end) 
                         } 
                     });
-                } else if (parsed.start) {
-                    // Fallback for old range format
-                    setSelectedDate({ 
-                        week: { 
-                            start: new Date(parsed.start), 
-                            end: parsed.end ? new Date(parsed.end) : new Date(parsed.start) 
-                        } 
-                    });
                 } else {
-                    // Fallback for old single date format
                     setSelectedDate({ day: new Date(parsed) });
                 }
             } catch (e) {
@@ -82,21 +70,19 @@ export default function DashboardPage() {
             }
         }
 
-        if (storedUser && authStatus === "true") {
+        if (user) {
             if (!onboardingComplete) {
                 router.push("/onboarding/start");
                 return;
             }
-            setUser(JSON.parse(storedUser));
-            setIsLoggedIn(true);
             setShowWelcome(true);
-            setTimeout(() => setShowWelcome(false), 3000);
+            const timer = setTimeout(() => setShowWelcome(false), 3000);
             setLoading(false);
+            return () => clearTimeout(timer);
         } else {
-            setIsLoggedIn(false);
             setLoading(false);
         }
-    }, [router]);
+    }, [router, mounted, authLoading, user]);
 
     const handleViewModeChange = (mode: "day" | "week") => {
         setViewMode(mode);
@@ -157,10 +143,9 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     }>
-                        {!isLoggedIn ? (
+                        {!user ? (
                             <div className="flex-1 flex flex-col items-center justify-center">
-                                <Loader2 size={32} className="animate-spin text-emerald-500 mb-4" />
-                                <span className="font-black text-slate-400 uppercase tracking-widest">Redirecting to login...</span>
+                                <span className="font-black text-slate-400 uppercase tracking-widest text-xs">Session Invalid...</span>
                             </div>
                         ) : (
                             <div className="flex-1 p-4 lg:p-8 overflow-y-auto relative scrollbar-hide">
@@ -173,7 +158,7 @@ export default function DashboardPage() {
                                             className="fixed top-20 left-1/2 z-[100] px-6 py-3 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-emerald-100 dark:border-emerald-900 flex items-center space-x-3 pointer-events-none"
                                         >
                                             <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white"><span>👋</span></div>
-                                            <span className="font-bold text-slate-800 dark:text-slate-100">Welcome back, {user?.fullName}</span>
+                                            <span className="font-bold text-slate-800 dark:text-slate-100">Welcome back, {user?.user_metadata?.full_name || user?.email}</span>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>

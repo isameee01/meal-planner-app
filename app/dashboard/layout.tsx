@@ -6,6 +6,7 @@ import { useMounted } from "../../lib/hooks/useMounted";
 import { FoodStateProvider } from "../../lib/contexts/FoodStateContext";
 import { MealStateProvider } from "../../lib/contexts/MealStateContext";
 import AdPopup from "../../components/ads/AdPopup";
+import { ProtectedRoute } from "../../components/auth/ProtectedRoute";
 
 export default function DashboardLayout({
   children,
@@ -29,27 +30,31 @@ export default function DashboardLayout({
 
   if (!mounted) {
     return (
-      <FoodStateProvider>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors overflow-hidden">
-          <div className="w-[280px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800" />
-          <main className="flex-1 w-full bg-slate-50 dark:bg-slate-950" />
-        </div>
-      </FoodStateProvider>
+      <ProtectedRoute>
+        <FoodStateProvider>
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors overflow-hidden">
+            <div className="w-[280px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800" />
+            <main className="flex-1 w-full bg-slate-50 dark:bg-slate-950" />
+          </div>
+        </FoodStateProvider>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <FoodStateProvider>
-      <MealStateProvider>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors overflow-hidden">
-          <Sidebar collapsed={collapsed} setCollapsed={handleSetCollapsed} />
-          
-          <main className="flex-1 min-w-0 h-screen overflow-y-auto relative scrollbar-hide">
-            {children}
-            <AdPopup />
-          </main>
-        </div>
-      </MealStateProvider>
-    </FoodStateProvider>
+    <ProtectedRoute>
+      <FoodStateProvider>
+        <MealStateProvider>
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors overflow-hidden">
+            <Sidebar collapsed={collapsed} setCollapsed={handleSetCollapsed} />
+            
+            <main className="flex-1 min-w-0 h-screen overflow-y-auto relative scrollbar-hide">
+              {children}
+              <AdPopup />
+            </main>
+          </div>
+        </MealStateProvider>
+      </FoodStateProvider>
+    </ProtectedRoute>
   );
 }

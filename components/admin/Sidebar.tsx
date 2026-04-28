@@ -22,6 +22,8 @@ import {
     UtensilsCrossed
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../../hooks/useAuth";
+import { useRouter } from "next/navigation";
 
 const MENU_ITEMS = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
@@ -39,6 +41,18 @@ const MENU_ITEMS = [
 
 export default function AdminSidebar({ collapsed, setCollapsed }: { collapsed: boolean, setCollapsed: (val: boolean) => void }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const { logout } = useAuth();
+    
+    const handleLogout = async () => {
+        try {
+            await logout();
+            router.push("/auth/login");
+        } catch (error) {
+            console.error("Admin logout failed", error);
+            router.push("/auth/login");
+        }
+    };
 
     return (
         <motion.aside
@@ -116,7 +130,10 @@ export default function AdminSidebar({ collapsed, setCollapsed }: { collapsed: b
                     <ExternalLink size={20} className="group-hover:text-emerald-400" />
                     {!collapsed && <span className="font-bold text-sm tracking-wide">View Website</span>}
                 </Link>
-                <button className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-all group">
+                <button 
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-all group"
+                >
                     <LogOut size={20} />
                     {!collapsed && <span className="font-bold text-sm tracking-wide">Logout</span>}
                 </button>

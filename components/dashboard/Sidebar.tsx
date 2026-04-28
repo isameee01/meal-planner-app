@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMounted } from "../../lib/hooks/useMounted";
+import { useAuth } from "../../hooks/useAuth";
 
 interface SidebarItemProps {
     icon: any;
@@ -105,13 +106,10 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
     const mounted = useMounted();
     const pathname = usePathname();
     const router = useRouter();
-    const [user, setUser] = useState<{ fullName: string } | null>(null);
-
-    useEffect(() => {
-        if (!mounted) return;
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) setUser(JSON.parse(storedUser));
-    }, [mounted]);
+    const { user, logout } = useAuth();
+    
+    // User metadata lookup if using full_name from supabase
+    const fullName = user?.user_metadata?.full_name || user?.email || "User";
 
     if (!mounted) return null;
 
@@ -159,9 +157,14 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
         { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
     ];
 
-    const handleLogout = () => {
-        localStorage.removeItem("isLoggedIn");
-        window.location.href = "/";
+    const handleLogout = async () => {
+        try {
+            await logout();
+            router.push("/auth/login");
+        } catch (error) {
+            console.error("Logout failed", error);
+            router.push("/auth/login");
+        }
     };
 
     return (
@@ -188,11 +191,11 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
                 {!collapsed && (
                     <div className="mb-6 px-3 py-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex items-center">
                         <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
-                            {user?.fullName?.charAt(0).toUpperCase() || "U"}
+                            {fullName.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{user?.fullName || "User"}</p>
-                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full">PRO PLAN</span>
+                        <div className="min-w-0 pr-2">
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{fullName}</p>
+                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full inline-block mt-1">PRO PLAN</span>
                         </div>
                     </div>
                 )}
