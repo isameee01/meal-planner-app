@@ -61,9 +61,9 @@ export default function FoodCard({
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 hover:shadow-md transition-all group no-print"
+                className="bg-white dark:bg-slate-900 rounded-[2rem] p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-6 hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-none transition-all group no-print"
             >
-                <div className="relative w-24 h-24 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800">
+                <div className="relative w-32 h-32 rounded-[1.5rem] overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 shadow-inner">
                     {!imageLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
@@ -133,10 +133,10 @@ export default function FoodCard({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-            className="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col h-full no-print"
+            className="bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-2xl hover:shadow-emerald-500/10 hover:-translate-y-2 transition-all duration-500 group flex flex-col h-full no-print"
         >
             {/* Header Image */}
-            <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-slate-800">
+            <div className="relative h-56 overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-slate-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800">
                 {!imageLoaded && (
                     <motion.div 
                         className="absolute inset-0 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800"
@@ -150,7 +150,7 @@ export default function FoodCard({
                         src={imageUrl}
                         alt={food.name}
                         fill
-                        className={`object-cover group-hover:scale-110 transition-all duration-700 ${imageLoaded ? "opacity-100" : "opacity-0 scale-105"}`}
+                        className={`object-contain p-4 group-hover:scale-110 transition-all duration-700 ${imageLoaded ? "opacity-100" : "opacity-0 scale-105"}`}
                         onLoadingComplete={() => setImageLoaded(true)}
                         onError={() => setImageError(true)}
                         loading="lazy"
@@ -213,7 +213,7 @@ export default function FoodCard({
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                 transition={{ duration: 0.2 }}
-                                className="absolute bottom-full left-0 mb-3 z-50 w-56 bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl shadow-2xl pointer-events-none"
+                                className="absolute bottom-full left-0 mb-3 z-50 w-56 bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-3xl shadow-2xl pointer-events-none"
                             >
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center text-xs">

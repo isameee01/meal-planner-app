@@ -331,7 +331,7 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
     ) => {
         setLoading(true);
         try {
-            const { rebalanceDayAI } = await import("../ai/generateMealPlan");
+            const { rebalanceDayAction } = await import("../../app/actions/aiActions");
 
             // Step 1: build the meals state WITH the new food already added (set loading flag)
             const addedItemWithLoading = { ...addedItem, isGeneratingRecipe: true };
@@ -346,14 +346,13 @@ export function MealStateProvider({ children }: { children: React.ReactNode }) {
                 });
             });
 
-            // Step 2: call AI rebalance
-            const rebalancedMeals = await rebalanceDayAI(
+            // Step 2: call AI rebalance (NOW SERVER-SIDE)
+            const rebalancedMeals = await rebalanceDayAction(
                 mealsWithFood,
                 addedItem,
                 slot,
                 userData,
-                targetCal,
-                adminSettings
+                targetCal
             );
 
             // Step 3: Identify all NEW foods that need recipes and mark them as generating

@@ -126,19 +126,26 @@ function buildMultiDayPrompt(
 
 USER PROFILE:
 - Age: ${userData.age || 30}
-- Weight: ${userData.weight || 70}kg
-- Goal: ${userData.goalType || "maintain"}
+- Current Weight: ${userData.weight || 70}kg
+- Target Weight Goal: ${userData.goalType || "maintain"}
 - Activity Level: ${userData.activityLevel || "moderate"}
-- Diet Type: ${userData.dietType || "anything"}
+- Diet Type Preference: ${userData.dietType || "anything"}
 
 STRICT NUTRITIONAL TARGETS (PER DAY):
-- Calories: ${userData.calorieTarget || 2000} kcal
+- Daily Calorie Target: ${userData.calorieTarget || 2000} kcal
 - Protein: ${userData.proteinTarget || 150}g
 - Carbs: ${userData.carbsTarget || 200}g
 - Fats: ${userData.fatsTarget || 60}g
 ${servingsNote}
 
 DATES TO GENERATE: ${dates.join(", ")}
+
+VARIETY REQUIREMENT:
+- Do NOT provide the same meals for every day. 
+- Tailor the meal selection specifically to someone who weighs ${userData.weight || 70}kg and is aiming to ${userData.goalType || "maintain"}.
+- Ensure the meal choices reflect a ${userData.dietType || "anything"} lifestyle.
+- Use the current timestamp seed for randomness: ${Date.now()}
+
 
 STRICT REQUIREMENTS:
 1. Generate ALL ${dates.length} days.
@@ -202,18 +209,16 @@ RETURN ONLY THIS EXACT JSON STRUCTURE (no explanation, no markdown):
 
 function transformAIDay(day: AIDay): GeneratedMeal[] {
     const slots = ["breakfast", "lunch", "dinner", "snack"] as const;
-    return slots.map(slotKey => {
-        const aiMeal = day.meals.find(m => m.type === slotKey);
+    const meals = slots.map(slotKey => {
+        const aiMeal = day.meals.find(m => m.type.toLowerCase() === slotKey);
         if (!aiMeal) {
             console.error(`[Transform] Missing meal type "${slotKey}" in day ${day.date}`);
             return null;
         }
 
-        // ── Safety layer: guarantee arrays are never undefined ──
         const safeIngredients = aiMeal.ingredients ?? [];
         const safeInstructions = aiMeal.instructions ?? [];
 
-        // ── Validation layer: Recalculate totals from ingredients to fix AI math hallucinations ──
         let calcCals = 0;
         let calcProtein = 0;
         let calcCarbs = 0;
@@ -223,7 +228,6 @@ function transformAIDay(day: AIDay): GeneratedMeal[] {
             const p = Math.max(0, ing.protein ?? 0);
             const c = Math.max(0, ing.carbs ?? 0);
             const f = Math.max(0, ing.fats ?? 0);
-            // If AI gave 0 calories but macros exist, fix it
             const calculatedIngCals = (p * 4) + (c * 4) + (f * 9);
             const finalIngCals = ing.calories > 0 ? ing.calories : calculatedIngCals;
 
@@ -233,8 +237,8 @@ function transformAIDay(day: AIDay): GeneratedMeal[] {
             calcCals += finalIngCals;
 
             return {
-                name: ing.name ?? "",
-                amount: ing.quantity ?? "",
+                name: ing.name ?? "Ingredient",
+                amount: ing.quantity ?? "1 portion",
                 calories: Math.round(finalIngCals),
                 protein: p,
                 carbs: c,
@@ -242,12 +246,11 @@ function transformAIDay(day: AIDay): GeneratedMeal[] {
             };
         });
 
-        // Use AI's total if it's within 10% of calc, otherwise use calc
         const aiTotalCals = aiMeal.calories ?? 0;
-        const finalMealCals = Math.abs(aiTotalCals - calcCals) / (calcCals || 1) < 0.1 ? aiTotalCals : calcCals;
+        const finalMealCals = Math.abs(aiTotalCals - calcCals) / (calcCals || 1) < 0.15 ? aiTotalCals : calcCals;
 
         const virtualFood: FoodItem = {
-            id: `ai-${slotKey}-${++aiGlobalIdCounter}`,
+            id: `ai-${slotKey}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             name: aiMeal.name ?? `AI ${slotKey}`,
             calories: Math.round(finalMealCals),
             protein: Math.round(calcProtein),
@@ -262,7 +265,7 @@ function transformAIDay(day: AIDay): GeneratedMeal[] {
             ingredients: validatedIngredients,
             directions: safeInstructions,
             prepTime: aiMeal.prepTime ?? 15,
-            description: `AI-generated ${slotKey} for ${day.date}. Goal: ${finalMealCals} kcal.`,
+            description: `AI-generated ${slotKey}.`,
         };
 
         return {
@@ -274,6 +277,9 @@ function transformAIDay(day: AIDay): GeneratedMeal[] {
             totalFat: Math.round(calcFat),
         } as GeneratedMeal;
     }).filter(Boolean) as GeneratedMeal[];
+
+    console.log(`[AI OUTPUT] Successfully transformed day ${day.date}. Total calories: ${meals.reduce((s, m) => s + m.totalCalories, 0)}`);
+    return meals;
 }
 
 
@@ -397,6 +403,8 @@ export async function generateMultiDayMealPlanAI(
     blockedFoodNames: string[] = [],
     retryCount = 0
 ): Promise<Record<string, GeneratedMeal[]>> {
+    console.log("[AI REQUEST] Using Admin Settings?", !!settings?.meal_prompt);
+    console.log("[AI REQUEST] Selected Model:", settings?.ai_model || "default");
     console.log("[AI REQUEST] Generating meal plan for dates:", dates);
     console.log("[AI REQUEST] User data:", JSON.stringify(userData));
     console.log("[AI REQUEST] Blocked foods:", blockedFoodNames);
@@ -418,27 +426,25 @@ export async function generateMultiDayMealPlanAI(
             model: settings?.ai_model || undefined
         });
 
-        console.log("[AI RAW RESPONSE]", responseText.substring(0, 500) + "...");
-
         let data: AIPlanResponse;
         try {
             data = JSON.parse(responseText);
         } catch (parseError) {
             console.error("[AI PARSE ERROR] Failed to parse JSON:", parseError);
-            // Try extracting JSON from the response (sometimes models add markdown)
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 data = JSON.parse(jsonMatch[0]);
             } else {
-                throw new Error("AI response is not valid JSON");
+                throw new Error("AI response is not valid JSON - NO FALLBACK ALLOWED");
             }
         }
 
-        console.log("[AI PARSED JSON] Days count:", data?.days?.length);
-        console.log("[AI PARSED JSON] First day meals:", data?.days?.[0]?.meals?.map((m: any) => `${m.type}: ${m.name}`));
+        console.log("[AI RAW RESPONSE]", JSON.stringify(data));
+        console.log("[AI OUTPUT]", JSON.stringify(data, null, 2));
 
         if (!validateAIPlan(data)) {
-            throw new Error("AI response failed mandatory structure validation");
+            console.error("[AI ERROR] Validation failed for data:", JSON.stringify(data));
+            throw new Error("AI response failed mandatory structure validation - NO FALLBACK ALLOWED");
         }
 
         // Build result map
@@ -451,11 +457,12 @@ export async function generateMultiDayMealPlanAI(
         for (const date of dates) {
             if (!result[date]) {
                 console.warn(`[AI] No data returned for date ${date}. Using fallback.`);
-                const cals = userData.targetCalories || 2000;
+                const cals = userData.calorieTarget || 2000;
                 result[date] = transformAIDay(createFallbackDay(date, cals));
             }
         }
 
+        console.log("[FINAL PLAN USED]", JSON.stringify(result, null, 2));
         return result;
 
     } catch (error) {
@@ -464,10 +471,10 @@ export async function generateMultiDayMealPlanAI(
             return generateMultiDayMealPlanAI(userData, settings, dates, blockedFoodNames, 1);
         }
 
-        console.error("[AI] Final generation failed for dates:", dates, error);
-        console.warn("[AI] Using detailed fallback plan for all dates.");
+        console.error("[AI ERROR] Final generation failed for dates:", dates, error);
+        console.warn("[AI] Using detailed fallback plan for all dates due to error.");
 
-        const cals = userData.targetCalories || 2000;
+        const cals = userData.calorieTarget || 2000;
         const result: Record<string, GeneratedMeal[]> = {};
         for (const date of dates) {
             result[date] = transformAIDay(createFallbackDay(date, cals));

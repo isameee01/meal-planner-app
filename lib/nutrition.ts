@@ -108,9 +108,12 @@ export function calculateNutritionProfile(
     const carbs = Math.round((calories * cPct) / 4);
     const fat = Math.round((calories * fPct) / 9);
 
-    return {
+    const result = {
         tdee,
         calories: Math.round(calories),
         macros: { protein, carbs, fat }
     };
+
+    console.log(`[CALCULATION] userCalories = ${result.calories} | Goal: ${goalType} | Diet: ${dietType} | TDEE: ${tdee}`);
+    return result;
 }

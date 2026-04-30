@@ -53,6 +53,7 @@ export function useUserProfile() {
                     role: (data.role as "admin" | "user") || (user?.email === "test-qa-1@example.com" ? "admin" : "user"),
                     updatedAt: data.updated_at
                 };
+                console.log("[PROFILE LOADED] Successfully fetched profile from Supabase for user:", data.id);
                 setProfile(mappedProfile);
                 localStorage.setItem(CACHE_KEY, JSON.stringify(mappedProfile));
             } else {
@@ -153,11 +154,14 @@ export function useUserProfile() {
                 updated_at: new Date().toISOString()
             };
 
+            console.log("[PROFILE UPDATE] Saving following data to Supabase:", JSON.stringify(dbUpdates, null, 2));
+
             const { error: upsertError } = await supabase
                 .from("user_profiles")
                 .upsert(dbUpdates);
 
             if (upsertError) throw upsertError;
+            console.log("[PROFILE SAVED] Successfully upserted profile to Supabase for user:", user.id);
 
             const newProfile: UserProfile = {
                 ...merged,

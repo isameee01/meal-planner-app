@@ -22,15 +22,13 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateMealPlan, GeneratedMeal, UserPreferences } from "../../lib/meal-planner";
-import { generateMultiDayMealPlanAI } from "../../lib/ai/generateMealPlan";
+import { generateMealPlanAction } from "../../app/actions/aiActions";
 import { useNutritionTargets } from "../../lib/hooks/useNutritionTargets";
 import { useGlobalFoodState } from "../../lib/contexts/FoodStateContext";
 import { FOOD_DATABASE } from "../../lib/food-db";
 import { useGeneratorSettings } from "../../lib/hooks/useGeneratorSettings";
 import { useAdminSettings } from "../../hooks/useAdminSettings";
 import DropdownMenu from "./DropdownMenu";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { MealCard } from "./MealCard";
 import { useMealState } from "../../lib/contexts/MealStateContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
@@ -101,9 +99,10 @@ export default function MealSection({
     const loadMeals = useCallback(async () => {
         if (isAILoading || isSynthesizing) return;
         
+        console.log("[UI] Triggering AI Meal Generation...");
         setIsProcessing(true);
         setIsSynthesizing(true);
-        setErrorMessage(null); // Clear previous errors
+        setErrorMessage(null);
 
         try {
             // Check Profile
@@ -143,19 +142,19 @@ export default function MealSection({
             };
 
             try {
-                // Single AI call for ALL missing dates
-                const combinedSettings = adminSettings || settings;
-                const aiPlansMap = await generateMultiDayMealPlanAI(
+                // Single AI call for ALL missing dates (NOW SERVER-SIDE)
+                const aiPlansMap = await generateMealPlanAction(
                     userData,
-                    combinedSettings,
+                    settings, // Client settings as fallback
                     missingDates,
                     blockedFoods
                 );
                 // Batch update all days at once
                 batchRegenerateDays(aiPlansMap);
                 console.log("[MealSection] AI successfully generated meals for:", Object.keys(aiPlansMap));
-            } catch (aiError) {
-                console.warn("[MealSection] AI failed. Falling back to local engine.", aiError);
+            } catch (aiError: any) {
+                console.error("[MealSection] AI CRITICAL FAILURE:", aiError);
+                setErrorMessage(`AI Generation Failed: ${aiError.message || "Unknown error"}. Using local backup generator.`);
                 
                 // Fallback: generate each missing date with local engine
                 const prefsRaw = localStorage.getItem("onboarding_preferences");
@@ -164,11 +163,11 @@ export default function MealSection({
                 const slots = mealsRaw ? JSON.parse(mealsRaw) : [{ name: "Breakfast" }, { name: "Lunch" }, { name: "Dinner" }, { name: "Snack" }];
 
                 const preferences: UserPreferences = {
-                    selectedCategories: Object.values(prefs as Record<string, OnboardingPref>).flatMap(p => p.categories),
+                    selectedCategories: Object.values(prefs as Record<string, any>).flatMap(p => p.categories || []),
                     favoriteFoodIds: [],
                     excludedFoodIds: [],
-                    customFoods: Object.values(prefs as Record<string, OnboardingPref>).flatMap(p => p.customFoods || []),
-                    mealSlots: (slots as OnboardingMealSlot[]).map(m => m.name),
+                    customFoods: Object.values(prefs as Record<string, any>).flatMap(p => p.customFoods || []),
+                    mealSlots: (slots as any[]).map(m => m.name),
                     intelligentGeneration: true,
                     settings: settings 
                 };
@@ -189,8 +188,8 @@ export default function MealSection({
                     }
                 }
                 batchRegenerateDays(fallbackMap);
-                setErrorMessage("AI is currently busy. High-quality local plans have been prepared.");
             }
+
 
         } catch (e) {
             console.error("[MealSection] Load failure:", e);
@@ -203,11 +202,16 @@ export default function MealSection({
     }, [targetDates, settings, getDateKey, userProfile, batchRegenerateDays, mealsMap, blockedFoods, adminSettings, setIsProcessing, isAILoading, isSynthesizing]);
 
     useEffect(() => {
-        if (!isStateLoading && !isProfileLoading && userProfile && !isAILoading) {
-            // Check if any of the target dates are missing meals
-            const anyMissing = targetDates.some(d => !mealsMap[getDateKey(d)]);
-            if (anyMissing) {
-                loadMeals();
+        if (!isStateLoading && !isProfileLoading && !isAILoading) {
+            if (userProfile) {
+                // Check if any of the target dates are missing meals
+                const anyMissing = targetDates.some(d => !mealsMap[getDateKey(d)]);
+                if (anyMissing) {
+                    console.log("[MealSection] Auto-trigger: Missing meals detected for dates.");
+                    loadMeals();
+                }
+            } else {
+                console.warn("[MealSection] Auto-trigger blocked: No user profile found.");
             }
         }
     }, [loadMeals, isStateLoading, isProfileLoading, userProfile, targetDates, getDateKey, mealsMap, isAILoading]);
@@ -238,15 +242,43 @@ export default function MealSection({
         }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
     }, [selectedDate, mealsMap, getDateKey]);
 
-    const handleGeneratePDF = useCallback(() => {
-        const doc = new jsPDF() as ExtendedJsPDF;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(22);
-        doc.setTextColor(16, 185, 129);
-        doc.text("CustomDailyDiet", 14, 25);
-        // ... (PDF logic)
-        doc.save(`meal-plan-${getDateKey(selectedDate)}.pdf`);
-    }, [selectedDate, getDateKey]);
+    const handleGeneratePDF = useCallback(async () => {
+        if (!userProfile) return;
+        
+        setIsProcessing(true);
+        try {
+            const mealsToExport: Record<string, GeneratedMeal[]> = {};
+            
+            if (viewMode === "day") {
+                const dateKey = getDateKey(selectedDate);
+                if (mealsMap[dateKey]) {
+                    mealsToExport[dateKey] = mealsMap[dateKey];
+                }
+            } else {
+                // Export all days in the current week view
+                targetDates.forEach(date => {
+                    const dateKey = getDateKey(date);
+                    if (mealsMap[dateKey]) {
+                        mealsToExport[dateKey] = mealsMap[dateKey];
+                    }
+                });
+            }
+
+            if (Object.keys(mealsToExport).length === 0) {
+                alert("No meals found for the selected period. Please generate a plan first.");
+                return;
+            }
+
+            const { generatePremiumPDF } = await import("../../lib/pdf-service");
+            await generatePremiumPDF(userProfile, mealsToExport, viewMode, selectedDate);
+            
+        } catch (error) {
+            console.error("PDF Export failed:", error);
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setIsProcessing(false);
+        }
+    }, [selectedDate, getDateKey, mealsMap, viewMode, targetDates, userProfile, setIsProcessing]);
 
     const shareItems = [
         { label: "Download PDF Plan", onClick: handleGeneratePDF, icon: <Download size={16} /> },
@@ -339,8 +371,22 @@ export default function MealSection({
                                         <MealCard key={`${dateKey}-${meal.slot}`} meal={meal} dateKey={dateKey} />
                                     ))
                                 ) : (
-                                    <div className="h-48 bg-slate-50 dark:bg-slate-800/40 rounded-[32px] border-2 border-dashed border-slate-100 dark:border-slate-800 flex flex-center">
-                                       {!isAILoading && !isSynthesizing && <p className="text-xs font-black uppercase text-slate-300 tracking-widest">Awaiting Plan Intel...</p>}
+                                    <div className="h-48 bg-slate-50 dark:bg-slate-800/40 rounded-[32px] border-2 border-dashed border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center p-6 text-center">
+                                       {!isAILoading && !isSynthesizing && (
+                                           <>
+                                                <p className="text-xs font-black uppercase text-slate-300 tracking-widest mb-4">Awaiting Plan Intel...</p>
+                                                {!userProfile && !isProfileLoading ? (
+                                                    <p className="text-[10px] text-red-500 font-bold uppercase">Complete profile first</p>
+                                                ) : (
+                                                    <button 
+                                                        onClick={loadMeals}
+                                                        className="px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-200 dark:shadow-none"
+                                                    >
+                                                        Generate Plan Now
+                                                    </button>
+                                                )}
+                                           </>
+                                       )}
                                     </div>
                                 )}
                             </div>

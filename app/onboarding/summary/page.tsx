@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUserProfile } from "../../../hooks/useUserProfile";
 import { useRouter } from "next/navigation";
 import { 
     calculateBMR, 
@@ -85,11 +86,32 @@ export default function SummaryPage() {
         }
     }, [router]);
 
-    const handleGenerate = () => {
+    const { updateProfile } = useUserProfile();
+
+    const handleGenerate = async () => {
         if (!isValid) return;
-        localStorage.setItem("nutritionProfile", JSON.stringify(profile));
-        localStorage.setItem("onboardingComplete", "true");
-        router.push("/onboarding/complete");
+        
+        try {
+            // Persist to Supabase via updateProfile
+            await updateProfile({
+                weightKg: profile.metrics.weight,
+                heightCm: profile.metrics.height,
+                age: profile.metrics.age,
+                sex: profile.metrics.gender,
+                activityLevel: profile.metrics.activityLevel,
+                goalType: profile.goal,
+                dietType: "anything" // Default, can be refined in preferences
+            });
+
+            localStorage.setItem("nutritionProfile", JSON.stringify(profile));
+            localStorage.setItem("onboardingComplete", "true");
+            router.push("/onboarding/complete");
+        } catch (err) {
+            console.error("Failed to save profile during onboarding:", err);
+            // Fallback to local only if DB fails, but try to continue
+            localStorage.setItem("onboardingComplete", "true");
+            router.push("/onboarding/complete");
+        }
     };
 
     if (!isMounted) return null;

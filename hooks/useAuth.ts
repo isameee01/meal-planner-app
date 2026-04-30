@@ -10,13 +10,15 @@ export function useAuth() {
     const authState = context || { user: null, session: null, loading: false };
 
     const signup = async (email: string, password: string, fullName: string = "") => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
                     full_name: fullName,
-                }
+                },
+                emailRedirectTo: `${origin}/auth/callback`,
             }
         });
         

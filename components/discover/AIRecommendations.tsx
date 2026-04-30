@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Sparkles, ArrowRight, Loader2, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { suggestFoodsAI, AISuggestion } from "../../lib/ai/suggestFoods";
+import { suggestFoodsAction } from "../../app/actions/aiActions";
+import { AISuggestion } from "../../lib/ai/suggestFoods";
 import { FULL_DISCOVER_DATABASE, FoodItem } from "../../lib/discover-db";
 import { useGlobalFoodState } from "../../lib/contexts/FoodStateContext";
 import FoodCard from "./FoodCard";
@@ -20,46 +21,56 @@ export default function AIRecommendations({ onAddToPlanner, onOpenNutrition }: A
     const { blockedFoods } = useGlobalFoodState();
 
     useEffect(() => {
-        async function fetchRecommendations() {
+        const loadAIRecommendations = async () => {
+            console.log("[Discover] Initializing AI Recommendations...");
             setLoading(true);
-            setError(null);
             try {
-                const statsStr = localStorage.getItem("user_stats");
-                const userData = statsStr ? JSON.parse(statsStr) : { weight: 70 };
+                // Get User Data
+                const profileStr = localStorage.getItem("user_profile_cache");
+                const userData = profileStr ? JSON.parse(profileStr) : null;
                 
+                const blockedFoodsStr = localStorage.getItem("blocked_foods");
+                const blockedList = blockedFoodsStr ? JSON.parse(blockedFoodsStr) : blockedFoods;
+
                 const goalStr = localStorage.getItem("user_goal");
                 const goal = goalStr ? JSON.parse(goalStr).goalType : "maintain";
 
-                // Fetch AI Suggestions
-                const aiSuggestions = await suggestFoodsAI(userData, goal, "Standard", blockedFoods);
+                if (!userData) {
+                    console.warn("[Discover] No user profile found for AI recommendations.");
+                }
+
+                // Fetch AI Suggestions (NOW SERVER-SIDE)
+                console.log(`[Discover] Fetching AI suggestions for goal: ${goal}`);
+                const aiSuggestions = await suggestFoodsAction(userData, goal, "Standard", blockedList);
                 
                 // Map to Database
                 const richSuggestions = aiSuggestions.map(s => {
-                    const foodMatch = FULL_DISCOVER_DATABASE.find(f => 
+                    const dbMatch = FULL_DISCOVER_DATABASE.find(f => 
                         f.name.toLowerCase().includes(s.name.toLowerCase()) || 
                         s.name.toLowerCase().includes(f.name.toLowerCase())
                     );
-                    return { ...s, food: foodMatch };
+                    return { ...s, food: dbMatch };
                 }).filter(s => {
                     // SECONDARY SAFETY GUARD: Ensure food match exists AND isn't blocked
                     if (!s.food) return false;
-                    const isBlocked = blockedFoods.some(blocked => 
+                    const isBlocked = blockedList.some((blocked: any) => 
                         s.food!.id === blocked || 
-                        s.food!.name.toLowerCase().trim() === blocked.toLowerCase().trim()
+                        s.food!.name.toLowerCase().trim() === (typeof blocked === 'string' ? blocked.toLowerCase().trim() : '')
                     );
                     return !isBlocked;
                 });
 
+                console.log(`[Discover] Successfully matched ${richSuggestions.length} AI suggestions.`);
                 setSuggestions(richSuggestions);
             } catch (err) {
-                console.error("AI Recommendations failed:", err);
+                console.error("[Discover] AI Recommendation failure:", err);
                 setError("Failed to fetch AI suggestions.");
             } finally {
                 setLoading(false);
             }
-        }
+        };
 
-        fetchRecommendations();
+        loadAIRecommendations();
     }, [blockedFoods]);
 
     if (loading) {
